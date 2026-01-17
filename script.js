@@ -76,7 +76,7 @@ function updateUI(volume) {
     alertBar.style.display = "none";
   } else {
     color = "#e74c3c";
-    status = "Bahaya";
+    status = "Bahaya";  
     alertBar.style.display = "flex";
     alertPerc.innerText = percentage;
   }
