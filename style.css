@@ -1,0 +1,321 @@
+:root {
+  --primary-red: #e65c5c;
+  --dark-bg: #333333;
+  --sidebar-bg: #444444;
+  --light-grey: #d9d9d9;
+  --status-green: #2ecc71;
+  --status-yellow: #f1c40f;
+  --status-orange: #e67e22;
+  --status-red: #e74c3c;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+}
+body {
+  background-color: var(--light-grey);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+header {
+  background-color: var(--dark-bg);
+  color: white;
+  padding: 15px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+}
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.logo-area i {
+  font-size: 2rem;
+}
+.logo-area h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.wrapper {
+  display: flex;
+  flex: 1;
+}
+
+/* Sidebar Styles */
+nav {
+  background-color: var(--sidebar-bg);
+  width: 250px;
+  color: white;
+  padding-top: 20px;
+}
+.nav-item {
+  padding: 15px 25px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  cursor: pointer;
+  transition: 0.3s;
+  text-decoration: none;
+  color: white;
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-size: 1rem;
+}
+.nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.nav-item.active {
+  background-color: var(--primary-red);
+}
+
+main {
+  flex: 1;
+  padding: 40px;
+}
+
+/* CSS UNTUK PINDAH HALAMAN */
+.page {
+  display: none;
+}
+.page.active {
+  display: block;
+}
+
+/* DASHBOARD DESIGN (Tetap) */
+.dashboard-header {
+  margin-bottom: 30px;
+}
+.dashboard-header h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  display: inline-block;
+  margin-right: 10px;
+}
+.dashboard-header span {
+  color: #666;
+  font-size: 1.2rem;
+}
+.cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-bottom: 30px;
+}
+.card {
+  background: white;
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+.card-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 15px;
+  margin-bottom: 25px;
+}
+.battery-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+  margin-top: 20px;
+}
+.battery-shape {
+  width: 120px;
+  height: 200px;
+  border: 8px solid var(--dark-bg);
+  border-radius: 15px;
+  position: relative;
+  padding: 5px;
+}
+.battery-shape::before {
+  content: "";
+  width: 50px;
+  height: 15px;
+  background: var(--dark-bg);
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 5px 5px 0 0;
+}
+.battery-level {
+  width: 100%;
+  height: 0%;
+  background: var(--status-green);
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  right: 5px;
+  width: calc(100% - 10px);
+  border-radius: 8px;
+  transition: 1s ease-in-out;
+}
+.percentage-text {
+  font-size: 5rem;
+  font-weight: 800;
+  color: var(--status-green);
+}
+.status-label {
+  font-size: 1.5rem;
+  color: #333;
+}
+.status-val {
+  font-weight: 700;
+  color: var(--status-green);
+}
+.parameter-list {
+  text-align: left;
+}
+.param-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 1.1rem;
+}
+.param-item span:first-child {
+  font-weight: 600;
+}
+#alert-bar {
+  background-color: var(--primary-red);
+  color: white;
+  padding: 15px;
+  border-radius: 8px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+/* DESIGN RIWAYAT (Baru) */
+.filter-card {
+  background: white;
+  padding: 25px;
+  border-radius: 15px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+.filter-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  margin-top: 15px;
+}
+.filter-group div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+.filter-group input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+.btn-red {
+  background: var(--primary-red);
+  color: white;
+  border: none;
+  padding: 10px 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.table-card {
+  background: white;
+  border-radius: 15px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.table-header {
+  padding: 20px 30px;
+  border-bottom: 1px solid #eee;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th {
+  background: #f8f9fa;
+  padding: 15px 30px;
+  text-align: left;
+  color: #333;
+  font-weight: 700;
+  border-bottom: 2px solid #eee;
+}
+td {
+  padding: 15px 30px;
+  border-bottom: 1px solid #eee;
+  font-size: 1rem;
+}
+.status-badge {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.export-area {
+  padding: 20px 30px;
+  text-align: right;
+}
+
+
+/* --- TAMBAHAN STYLE UNTUK TABEL BARU --- */
+
+/* Agar tabel bisa discroll horizontal pada layar HP */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+/* Warna Badge Khusus Pengisian (Hijau/Biru) */
+.status-badge.badge-fill {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #bbdefb;
+}
+
+/* Warna Badge Khusus Pemakaian/Berkurang (Oranye) */
+.status-badge.badge-drain {
+    background: #fff3e0;
+    color: #ef6c00;
+    border: 1px solid #ffe0b2;
+}
+
+/* Style ikon di dalam badge agar rapi */
+.status-badge i {
+    margin-right: 5px;
+    font-size: 0.8rem;
+}
+
+@media (max-width: 992px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+  nav {
+    width: 80px;
+  }
+  .nav-item span {
+    display: none;
+  }
+}

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Genset Fuel Monitoring System - Dashboard</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database-compat.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <header>
+    <div class="logo-area">
+      <i class="fa-solid fa-shield-halved"></i>
+      <h1>Genset Fuel Monitoring System</h1>
+    </div>
+    <div class="user-area">
+      <i class="fa-regular fa-bell" style="font-size: 1.5rem; cursor: pointer"></i>
+    </div>
+  </header>
+
+  <div class="wrapper">
+    <nav>
+      <button onclick="showPage('dashboard')" id="btn-dashboard" class="nav-item active">
+        <i class="fa-solid fa-gauge-high"></i>
+        <span>Dashboard</span>
+      </button>
+      <button onclick="showPage('riwayat')" id="btn-riwayat" class="nav-item">
+        <i class="fa-solid fa-file-lines"></i>
+        <span>Riwayat</span>
+      </button>
+      <button class="nav-item">
+        <i class="fa-solid fa-users"></i>
+        <span>Manajemen User</span>
+      </button>
+    </nav>
+
+    <main>
+      <div id="dashboard" class="page active">
+        <div class="dashboard-header">
+          <h2>Dashboard</h2>
+          <span>Monitoring System</span>
+        </div>
+
+        <div class="cards-grid">
+          <div class="card">
+            <div class="card-title">Level Bahan Bakar Genset</div>
+            <div class="battery-container">
+              <div class="battery-shape">
+                <div id="battery-fill" class="battery-level"></div>
+              </div>
+              <div style="text-align: left">
+                <div class="percentage-text" id="perc-val">0%</div>
+                <div class="status-label">
+                  Status :
+                  <span id="status-text" class="status-val">Memuat...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Parameter Monitoring</div>
+            <div class="parameter-list">
+              <div class="param-item">
+                <span>Tinggi BBM <i class="fa-solid fa-chevron-right"></i></span>
+                <span id="p-tinggi">0 CM</span>
+              </div>
+              <div class="param-item">
+                <span>Volume BBM <i class="fa-solid fa-chevron-right"></i></span>
+                <span id="p-volume">0 L</span>
+              </div>
+              <div class="param-item">
+                <span>Estimasi Operasi <i class="fa-solid fa-chevron-right"></i></span>
+                <span id="p-estimasi">Calculating...</span>
+              </div>
+              <div class="param-item">
+                <span>Suhu <i class="fa-solid fa-chevron-right"></i></span>
+                <span id="p-suhu">-</span>
+              </div>
+              <div class="param-item">
+                <span>Tegangan <i class="fa-solid fa-chevron-right"></i></span>
+                <span id="p-tegangan">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="alert-bar">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          Level BBM <span id="alert-perc">0</span> % (Perlu Pengisian)
+        </div>
+      </div>
+
+      <div id="riwayat" class="page">
+        <div class="dashboard-header">
+          <h2>Riwayat</h2>
+          <span>Operasional Genset</span>
+        </div>
+
+        <div class="filter-card">
+          <h3 style="
+                font-size: 1.1rem;
+                border-bottom: 2px solid #eee;
+                padding-bottom: 10px;
+              ">
+            Filter Tanggal
+          </h3>
+          <div class="filter-group">
+            <div>
+              <label>Start Date</label>
+              <input type="date" />
+            </div>
+            <div>
+              <label>End Date</label>
+              <input type="date" />
+            </div>
+            <button class="btn-red">
+              Filter
+              <i class="fa-solid fa-chevron-right" style="font-size: 0.8rem; margin-left: 5px"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <div class="table-header">
+            <h3 style="font-size: 1.1rem">Data Riwayat Operasional</h3>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Jam Nyala</th>
+                <th>Durasi</th>
+                <th>Konsumsi BBM</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>05/02/2026</td>
+                <td>08 : 00</td>
+                <td>4 Jam</td>
+                <td>30 L</td>
+                <td><span class="status-badge">Normal</span></td>
+              </tr>
+              <tr>
+                <td>09/02/2026</td>
+                <td>16 : 00</td>
+                <td>6 Jam</td>
+                <td>50 L</td>
+                <td><span class="status-badge">Normal</span></td>
+              </tr>
+              <tr>
+                <td>13/02/2026</td>
+                <td>10 : 00</td>
+                <td>3 Jam</td>
+                <td>30 L</td>
+                <td><span class="status-badge">Normal</span></td>
+              </tr>
+              <tr>
+                <td>18/02/2026</td>
+                <td>12 : 00</td>
+                <td>2 Jam</td>
+                <td>25 L</td>
+                <td><span class="status-badge">Normal</span></td>
+              </tr>
+              <tr>
+                <td>22/02/2026</td>
+                <td>19 : 00</td>
+                <td>3 Jam</td>
+                <td>30 L</td>
+                <td><span class="status-badge">Normal</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="export-area">
+            <button class="btn-red" style="padding: 8px 20px; font-size: 0.9rem">
+              <i class="fa-solid fa-file-export" style="margin-right: 8px"></i>
+              Export Data
+            </button>
+          </div>
+        </div>
+
+      </div>
+      <div class="table-card" style="margin-top: 30px;">
+        <div class="table-header">
+          <h3 style="font-size: 1.1rem;">Log Perubahan Bahan Bakar (Real-time)</h3>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Jam</th>
+                <th>Perubahan Volume</th>
+                <th>Jenis Aktivitas</th>
+                <th>Status Sensor</th>
+              </tr>
+            </thead>
+            <tbody id="log-table-body">
+              <!-- Data akan dimuat dari Firebase -->
+              <tr>
+                <td colspan="5" style="text-align: center;">Memuat data...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="export-area">
+          <button class="btn-red" style="padding: 8px 20px; font-size: 0.9rem;">
+            <i class="fa-solid fa-download" style="margin-right: 8px;"></i> Unduh Log
+          </button>
+        </div>
+      </div>
+  </div>
+
+  </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
