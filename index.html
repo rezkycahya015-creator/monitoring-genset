@@ -116,13 +116,13 @@
           <div class="filter-group">
             <div>
               <label>Start Date</label>
-              <input type="date" />
+              <input type="date" id="start-date" />
             </div>
             <div>
               <label>End Date</label>
-              <input type="date" />
+              <input type="date" id="end-date" />
             </div>
-            <button class="btn-red">
+            <button class="btn-red" id="btn-filter">
               Filter
               <i class="fa-solid fa-chevron-right" style="font-size: 0.8rem; margin-left: 5px"></i>
             </button>
@@ -133,56 +133,26 @@
           <div class="table-header">
             <h3 style="font-size: 1.1rem">Data Riwayat Operasional</h3>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Tanggal</th>
-                <th>Jam Nyala</th>
-                <th>Durasi</th>
-                <th>Konsumsi BBM</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>05/02/2026</td>
-                <td>08 : 00</td>
-                <td>4 Jam</td>
-                <td>30 L</td>
-                <td><span class="status-badge">Normal</span></td>
-              </tr>
-              <tr>
-                <td>09/02/2026</td>
-                <td>16 : 00</td>
-                <td>6 Jam</td>
-                <td>50 L</td>
-                <td><span class="status-badge">Normal</span></td>
-              </tr>
-              <tr>
-                <td>13/02/2026</td>
-                <td>10 : 00</td>
-                <td>3 Jam</td>
-                <td>30 L</td>
-                <td><span class="status-badge">Normal</span></td>
-              </tr>
-              <tr>
-                <td>18/02/2026</td>
-                <td>12 : 00</td>
-                <td>2 Jam</td>
-                <td>25 L</td>
-                <td><span class="status-badge">Normal</span></td>
-              </tr>
-              <tr>
-                <td>22/02/2026</td>
-                <td>19 : 00</td>
-                <td>3 Jam</td>
-                <td>30 L</td>
-                <td><span class="status-badge">Normal</span></td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Jam Nyala</th>
+                  <th>Durasi</th>
+                  <th>Konsumsi BBM</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="riwayat-table-body">
+                <tr>
+                  <td colspan="5" style="text-align: center;">Memuat data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div class="export-area">
-            <button class="btn-red" style="padding: 8px 20px; font-size: 0.9rem">
+            <button class="btn-red" id="btn-export-riwayat" style="padding: 8px 20px; font-size: 0.9rem">
               <i class="fa-solid fa-file-export" style="margin-right: 8px"></i>
               Export Data
             </button>
@@ -216,7 +186,7 @@
         </div>
 
         <div class="export-area">
-          <button class="btn-red" style="padding: 8px 20px; font-size: 0.9rem;">
+          <button class="btn-red" id="btn-export-logs" style="padding: 8px 20px; font-size: 0.9rem;">
             <i class="fa-solid fa-download" style="margin-right: 8px;"></i> Unduh Log
           </button>
         </div>

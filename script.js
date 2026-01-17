@@ -76,7 +76,7 @@ function updateUI(volume) {
     alertBar.style.display = "none";
   } else {
     color = "#e74c3c";
-    status = "Bahaya";  
+    status = "Bahaya";
     alertBar.style.display = "flex";
     alertPerc.innerText = percentage;
   }
@@ -97,93 +97,277 @@ db.ref("/genset/tinggi").on("value", (snapshot) => {
   if (val !== null) pTinggi.innerText = val + " CM";
 });
 
-// --- LOGIKA REAL-TIME LOGS ---
+// --- LOGIKA REAL-TIME & HISTORY ---
+
+// State Global untuk Data
+let operationalHistoryData = [];
+let fuelLogData = [];
+
 const logTableBody = document.getElementById("log-table-body");
+const riwayatTableBody = document.getElementById("riwayat-table-body");
 
-db.ref("/genset/last_run").on("value", (snapshot) => {
+const startDateInput = document.getElementById("start-date");
+const endDateInput = document.getElementById("end-date");
+const btnFilter = document.getElementById("btn-filter");
+
+const btnExportRiwayat = document.getElementById("btn-export-riwayat");
+const btnExportLogs = document.getElementById("btn-export-logs");
+
+// 1. DATA RIWAYAT OPERASIONAL (Fetch from /genset/history)
+db.ref("/genset/history").on("value", (snapshot) => {
   const data = snapshot.val();
+  operationalHistoryData = []; // Reset
 
-  // Jika tidak ada data atau data dummy default
-  if (!data || !data.tanggal) {
-    if (logTableBody.children.length === 0 || logTableBody.innerHTML.includes("Memuat")) {
-      logTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Menunggu data aktivitas...</td></tr>`;
-    }
+  if (data) {
+    // Convert Object to Array
+    Object.keys(data).forEach((key) => {
+      operationalHistoryData.push({
+        id: key,
+        ...data[key],
+      });
+    });
+
+    // Urutkan berdasarkan tanggal descending (terbaru diatas)
+    // Asumsi format tanggal di DB bisa diparsing atau string ISO. 
+    // Jika format DD/MM/YYYY, kita perlu parse manual untuk sorting.
+    // Disini saya pakai simple reverse jika data masuk berurutan, atau sort by key.
+    operationalHistoryData.reverse();
+  }
+
+  renderRiwayat(operationalHistoryData);
+});
+
+// Render Fungsi Riwayat
+function renderRiwayat(data) {
+  riwayatTableBody.innerHTML = "";
+
+  if (data.length === 0) {
+    riwayatTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Tidak ada data.</td></tr>`;
     return;
   }
 
-  // Bersihkan "Memuat data..." jika ada
-  if (logTableBody.innerHTML.includes("Memuat")) {
-    logTableBody.innerHTML = "";
-  }
+  data.forEach((item) => {
+    const row = `
+      <tr>
+        <td>${item.tanggal || "-"}</td>
+        <td>${item.jam_nyala || "-"}</td>
+        <td>${item.durasi || "-"}</td>
+        <td>${item.konsumsi_bbm || "-"}</td>
+        <td><span class="status-badge">${item.status || "Normal"}</span></td>
+      </tr>
+    `;
+    riwayatTableBody.innerHTML += row;
+  });
+}
 
-  // --- 1. SIAPKAN DATA ---
-  // Parse Tanggal & Jam (Format di DB: "DD/MM/YYYY HH:mm")
-  let datePart = "Unknown";
-  let timePart = "Unknown";
 
-  if (data.tanggal) {
-    const parts = data.tanggal.split(" ");
-    if (parts.length >= 2) {
-      datePart = parts[0];
-      timePart = parts[1];
-    }
-  }
+// 2. DATA LOG PERUBAHAN BAHAN BAKAR (Real-time Accumulation)
+// Karena /genset/last_run hanya mengirim data SATU log terakhir,
+// Kita simpan di array lokal sesi ini.
+// IDEALNYA: Ada path /genset/fuel_logs yang menyimpan semua history log.
+// Namun sesuai request "dibuat responsif dan update setiap ada perubahan",
+// saya akan tetap listen last_run dan append ke array local.
 
-  // Hitung Perubahan Volume
-  let volAwal = parseFloat(data.volume_awal || 0);
-  let volAkhir = parseFloat(data.volume_akhir || 0);
-  let diff = volAkhir - volAwal;
+db.ref("/genset/last_run").on("value", (snapshot) => {
+  const data = snapshot.val();
+  if (!data || !data.tanggal) return; // Skip empty
 
-  // Tentukan Style & Label
-  let volumeText = "";
-  let volumeStyle = "";
-  let activityBadge = "";
+  // Cek duplicate biar gak double kalau ada refresh/init value
+  const exists = fuelLogData.find(d => d.tanggal === data.tanggal);
+  // Note: menggunakan 'tanggal' sebagai unique ID agak riskan kalau string sama persis, 
+  // tapi cukup untuk usecase sederhana.
 
-  if (diff >= 0) {
-    // Pengisian (atau 0)
-    volumeText = "+ " + diff.toFixed(1) + " L";
-    volumeStyle = "color: #2e7d32; font-weight: 600;";
-    activityBadge = `<span class="status-badge badge-fill"><i class="fa-solid fa-gas-pump"></i> Pengisian</span>`;
-  } else {
-    // Pemakaian
-    volumeText = "- " + Math.abs(diff).toFixed(1) + " L";
-    volumeStyle = "color: #e67e22; font-weight: 600;";
-    activityBadge = `<span class="status-badge badge-drain"><i class="fa-solid fa-arrow-trend-down"></i> Pemakaian</span>`;
-  }
+  if (!exists) {
+    // Add to beginning
+    fuelLogData.unshift(data);
 
-  // --- 2. LOGIKA UPDATE VS INSERT ---
-  // Kita gunakan 'tanggal' sebagai ID unik sederhana.
-  // Jika tanggal sama dengan baris paling atas, kita UPDATE baris itu.
-  // Jika beda, kita INSERT baris baru di atas.
-
-  // Hapus karakter non-alphanumeric untuk jadi ID valid HTML
-  const rowId = "row-" + data.tanggal.replace(/[^a-zA-Z0-9]/g, "");
-  const existingRow = document.getElementById(rowId);
-
-  const rowContent = `
-        <td>${datePart}</td>
-        <td>${timePart}</td>
-        <td style="${volumeStyle}">${volumeText}</td>
-        <td>${activityBadge}</td>
-        <td>${data.status || "Normal"}</td>
-  `;
-
-  if (existingRow) {
-    // Update baris yang sudah ada
-    existingRow.innerHTML = rowContent;
-  } else {
-    // Data Baru -> Tambah Row Baru
-    const newRow = document.createElement("tr");
-    newRow.id = rowId;
-    newRow.innerHTML = rowContent;
-    newRow.classList.add("fade-in"); // Optional animation class if existing
-
-    // Prepend (Taruh paling atas)
-    logTableBody.insertBefore(newRow, logTableBody.firstChild);
-
-    // Batasi jumlah baris
-    if (logTableBody.children.length > 10) {
-      logTableBody.removeChild(logTableBody.lastChild);
-    }
+    // Perbarui Tampilan (jika tidak sedang difilter/mode default)
+    // Atau trigger filter ulang jika sedang ada filter aktif?
+    // Simplified: Render ulang semua (atau filtered)
+    applyFilter();
   }
 });
+
+function renderLogs(data) {
+  logTableBody.innerHTML = "";
+
+  if (data.length === 0) {
+    logTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Belum ada data log baru.</td></tr>`;
+    return;
+  }
+
+  data.forEach((item) => {
+    // Parse Tanggal & Jam
+    let datePart = "-";
+    let timePart = "-";
+    if (item.tanggal) {
+      const parts = item.tanggal.split(" ");
+      if (parts.length >= 2) {
+        datePart = parts[0];
+        timePart = parts[1];
+      } else {
+        datePart = item.tanggal;
+      }
+    }
+
+    // Hitung Perubahan
+    let volAwal = parseFloat(item.volume_awal || 0);
+    let volAkhir = parseFloat(item.volume_akhir || 0);
+    let diff = volAkhir - volAwal;
+
+    let volumeText = "";
+    let volumeStyle = "";
+    let activityBadge = "";
+
+    if (diff >= 0) {
+      volumeText = "+ " + diff.toFixed(1) + " L";
+      volumeStyle = "color: #2e7d32; font-weight: 600;";
+      activityBadge = `<span class="status-badge badge-fill"><i class="fa-solid fa-gas-pump"></i> Pengisian</span>`;
+    } else {
+      volumeText = "- " + Math.abs(diff).toFixed(1) + " L";
+      volumeStyle = "color: #e67e22; font-weight: 600;";
+      activityBadge = `<span class="status-badge badge-drain"><i class="fa-solid fa-arrow-trend-down"></i> Pemakaian</span>`;
+    }
+
+    const row = `
+        <tr>
+            <td>${datePart}</td>
+            <td>${timePart}</td>
+            <td style="${volumeStyle}">${volumeText}</td>
+            <td>${activityBadge}</td>
+            <td>${item.status || "Normal"}</td>
+        </tr>
+      `;
+    logTableBody.innerHTML += row;
+  });
+}
+
+
+// --- 3. FITUR FILTER TANGGAL ---
+btnFilter.addEventListener("click", applyFilter);
+
+function applyFilter() {
+  const startVal = startDateInput.value; // YYYY-MM-DD
+  const endVal = endDateInput.value;     // YYYY-MM-DD
+
+  // Filter Data Riwayat
+  const filteredRiwayat = filterDataByDate(operationalHistoryData, startVal, endVal);
+  renderRiwayat(filteredRiwayat);
+
+  // Filter Data Logs
+  const filteredLogs = filterDataByDate(fuelLogData, startVal, endVal);
+  renderLogs(filteredLogs);
+}
+
+function filterDataByDate(dataArray, startDateStr, endDateStr) {
+  if (!startDateStr && !endDateStr) return dataArray; // No filter
+
+  const start = startDateStr ? new Date(startDateStr) : null;
+  const end = endDateStr ? new Date(endDateStr) : null;
+  // Set end date to end of day
+  if (end) end.setHours(23, 59, 59, 999);
+
+  return dataArray.filter(item => {
+    // Asumsi item.tanggal format "DD/MM/YYYY HH:mm" atau "DD/MM/YYYY"
+    // Kita perlu parse manual karena format Indo
+    if (!item.tanggal) return false;
+
+    // Split date & time
+    const [datePart, timePart] = item.tanggal.split(" ");
+    const [day, month, year] = datePart.split("/");
+
+    // Create Date object (Month is 0-indexed)
+    const itemDate = new Date(year, month - 1, day);
+
+    if (start && itemDate < start) return false;
+    if (end && itemDate > end) return false;
+
+    return true;
+  });
+}
+
+
+// --- 4. EXPORT TO EXCEL (CSV) ---
+btnExportRiwayat.addEventListener("click", () => {
+  // Get current displayed data (bisa filtered)
+  // Disini saya ambil dari logic filter ulang biar konsisten
+  const startVal = startDateInput.value;
+  const endVal = endDateInput.value;
+  const dataToExport = filterDataByDate(operationalHistoryData, startVal, endVal);
+
+  if (dataToExport.length === 0) {
+    alert("Tidak ada data untuk diexport");
+    return;
+  }
+
+  // Format Data untuk CSV
+  const csvData = dataToExport.map(item => ({
+    Tanggal: item.tanggal,
+    "Jam Nyala": item.jam_nyala,
+    Durasi: item.durasi,
+    "Konsumsi BBM": item.konsumsi_bbm,
+    Status: item.status
+  }));
+
+  exportToCSV(csvData, "Riwayat_Operasional_Genset.csv");
+});
+
+btnExportLogs.addEventListener("click", () => {
+  const startVal = startDateInput.value;
+  const endVal = endDateInput.value;
+  const dataToExport = filterDataByDate(fuelLogData, startVal, endVal);
+
+  if (dataToExport.length === 0) {
+    alert("Tidak ada data log untuk diexport");
+    return;
+  }
+
+  const csvData = dataToExport.map(item => {
+    let volAwal = parseFloat(item.volume_awal || 0);
+    let volAkhir = parseFloat(item.volume_akhir || 0);
+    let diff = volAkhir - volAwal;
+    let changeText = (diff >= 0 ? "+" : "") + diff.toFixed(1);
+
+    return {
+      Tanggal: item.tanggal,
+      "Volume Awal": volAwal,
+      "Volume Akhir": volAkhir,
+      "Perubahan": changeText,
+      Status: item.status
+    };
+  });
+
+  exportToCSV(csvData, "Log_Bahan_Bakar.csv");
+});
+
+function exportToCSV(data, filename) {
+  if (!data || !data.length) return;
+
+  const separator = ",";
+  const keys = Object.keys(data[0]);
+
+  // Header
+  let csvContent = keys.join(separator) + "\n";
+
+  // Body
+  data.forEach(row => {
+    const rowStr = keys.map(k => {
+      let val = row[k] ? row[k].toString() : "";
+      // Escape quote if needed
+      if (val.includes(",")) val = `"${val}"`;
+      return val;
+    }).join(separator);
+    csvContent += rowStr + "\n";
+  });
+
+  // Create Download Link
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
