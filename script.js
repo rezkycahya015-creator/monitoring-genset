@@ -9,12 +9,33 @@ function showPage(pageId) {
 
   // Update status tombol navigasi
   document
+  
     .querySelectorAll(".nav-item")
     .forEach((btn) => btn.classList.remove("active"));
   if (pageId === "dashboard")
     document.getElementById("btn-dashboard").classList.add("active");
   if (pageId === "riwayat")
     document.getElementById("btn-riwayat").classList.add("active");
+
+  // Tutup sidebar jika di mobile setelah pindah halaman
+  closeSidebar();
+}
+
+// --- SIDEBAR TOGGLE LOGIC ---
+const sidebar = document.getElementById("sidebar");
+const sidebarOverlay = document.getElementById("sidebar-overlay");
+const btnToggleNav = document.getElementById("btn-toggle-nav");
+
+btnToggleNav.addEventListener("click", () => {
+  sidebar.classList.toggle("active");
+  sidebarOverlay.classList.toggle("active");
+});
+
+sidebarOverlay.addEventListener("click", closeSidebar);
+
+function closeSidebar() {
+  sidebar.classList.remove("active");
+  sidebarOverlay.classList.remove("active");
 }
 
 // --- CONFIG FIREBASE ---
@@ -287,10 +308,9 @@ function filterDataByDate(dataArray, startDateStr, endDateStr) {
 }
 
 
-// --- 4. EXPORT TO EXCEL (CSV) ---
+// --- 4. EXPORT TO EXCEL (.xlsx) ---
 btnExportRiwayat.addEventListener("click", () => {
   // Get current displayed data (bisa filtered)
-  // Disini saya ambil dari logic filter ulang biar konsisten
   const startVal = startDateInput.value;
   const endVal = endDateInput.value;
   const dataToExport = filterDataByDate(operationalHistoryData, startVal, endVal);
@@ -300,16 +320,16 @@ btnExportRiwayat.addEventListener("click", () => {
     return;
   }
 
-  // Format Data untuk CSV
-  const csvData = dataToExport.map(item => ({
-    Tanggal: item.tanggal,
+  // Format Data
+  const formattedData = dataToExport.map(item => ({
+    "Tanggal": item.tanggal,
     "Jam Nyala": item.jam_nyala,
-    Durasi: item.durasi,
+    "Durasi": item.durasi,
     "Konsumsi BBM": item.konsumsi_bbm,
-    Status: item.status
+    "Status": item.status
   }));
 
-  exportToCSV(csvData, "Riwayat_Operasional_Genset.csv");
+  exportToExcel(formattedData, "Riwayat_Operasional_Genset");
 });
 
 btnExportLogs.addEventListener("click", () => {
@@ -322,52 +342,34 @@ btnExportLogs.addEventListener("click", () => {
     return;
   }
 
-  const csvData = dataToExport.map(item => {
+  const formattedData = dataToExport.map(item => {
     let volAwal = parseFloat(item.volume_awal || 0);
     let volAkhir = parseFloat(item.volume_akhir || 0);
     let diff = volAkhir - volAwal;
     let changeText = (diff >= 0 ? "+" : "") + diff.toFixed(1);
 
     return {
-      Tanggal: item.tanggal,
+      "Tanggal": item.tanggal,
       "Volume Awal": volAwal,
       "Volume Akhir": volAkhir,
       "Perubahan": changeText,
-      Status: item.status
+      "Status": item.status
     };
   });
 
-  exportToCSV(csvData, "Log_Bahan_Bakar.csv");
+  exportToExcel(formattedData, "Log_Bahan_Bakar");
 });
 
-function exportToCSV(data, filename) {
+function exportToExcel(data, filenameBase) {
   if (!data || !data.length) return;
 
-  const separator = ",";
-  const keys = Object.keys(data[0]);
+  // Buat Worksheet
+  const worksheet = XLSX.utils.json_to_sheet(data);
 
-  // Header
-  let csvContent = keys.join(separator) + "\n";
+  // Buat Workbook
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
 
-  // Body
-  data.forEach(row => {
-    const rowStr = keys.map(k => {
-      let val = row[k] ? row[k].toString() : "";
-      // Escape quote if needed
-      if (val.includes(",")) val = `"${val}"`;
-      return val;
-    }).join(separator);
-    csvContent += rowStr + "\n";
-  });
-
-  // Create Download Link
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  // Generate File Excel
+  XLSX.writeFile(workbook, `${filenameBase}.xlsx`);
 }
