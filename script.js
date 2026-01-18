@@ -9,13 +9,18 @@ function showPage(pageId) {
 
   // Update status tombol navigasi
   document
-  
+
     .querySelectorAll(".nav-item")
     .forEach((btn) => btn.classList.remove("active"));
   if (pageId === "dashboard")
     document.getElementById("btn-dashboard").classList.add("active");
   if (pageId === "riwayat")
     document.getElementById("btn-riwayat").classList.add("active");
+  if (pageId === "user")
+    document.getElementById("btn-user").classList.add("active");
+
+  // Tutup sidebar jika di mobile setelah pindah halaman
+  closeSidebar();
 
   // Tutup sidebar jika di mobile setelah pindah halaman
   closeSidebar();
@@ -152,6 +157,7 @@ db.ref("/genset/history").on("value", (snapshot) => {
     // Asumsi format tanggal di DB bisa diparsing atau string ISO. 
     // Jika format DD/MM/YYYY, kita perlu parse manual untuk sorting.
     // Disini saya pakai simple reverse jika data masuk berurutan, atau sort by key.
+    // Urutkan berdasarkan tanggal descending (terbaru diatas)
     operationalHistoryData.reverse();
   }
 
@@ -170,7 +176,10 @@ function renderRiwayat(data) {
   data.forEach((item) => {
     const row = `
       <tr>
-        <td>${item.tanggal || "-"}</td>
+        <td>
+           ${item.tanggal || "-"}
+           <button class="btn-delete" onclick="deleteHistory('${item.id}')"><i class="fa-solid fa-trash"></i></button>
+        </td>
         <td>${item.jam_nyala || "-"}</td>
         <td>${item.durasi || "-"}</td>
         <td>${item.konsumsi_bbm || "-"}</td>
@@ -182,31 +191,26 @@ function renderRiwayat(data) {
 }
 
 
-// 2. DATA LOG PERUBAHAN BAHAN BAKAR (Real-time Accumulation)
-// Karena /genset/last_run hanya mengirim data SATU log terakhir,
-// Kita simpan di array lokal sesi ini.
-// IDEALNYA: Ada path /genset/fuel_logs yang menyimpan semua history log.
-// Namun sesuai request "dibuat responsif dan update setiap ada perubahan",
-// saya akan tetap listen last_run dan append ke array local.
-
-db.ref("/genset/last_run").on("value", (snapshot) => {
+// 2. DATA LOG PERUBAHAN BAHAN BAKAR (PERSISTENT /genset/logs)
+db.ref("/genset/logs").on("value", (snapshot) => {
   const data = snapshot.val();
-  if (!data || !data.tanggal) return; // Skip empty
+  fuelLogData = [];
 
-  // Cek duplicate biar gak double kalau ada refresh/init value
-  const exists = fuelLogData.find(d => d.tanggal === data.tanggal);
-  // Note: menggunakan 'tanggal' sebagai unique ID agak riskan kalau string sama persis, 
-  // tapi cukup untuk usecase sederhana.
+  if (data) {
+    // Convert Object to Array
+    Object.keys(data).forEach((key) => {
+      fuelLogData.push({
+        id: key,
+        ...data[key],
+      });
+    });
 
-  if (!exists) {
-    // Add to beginning
-    fuelLogData.unshift(data);
-
-    // Perbarui Tampilan (jika tidak sedang difilter/mode default)
-    // Atau trigger filter ulang jika sedang ada filter aktif?
-    // Simplified: Render ulang semua (atau filtered)
-    applyFilter();
+    // Reverse agar terbaru diatas
+    fuelLogData.reverse();
   }
+
+  // Render Logs
+  renderLogs(fuelLogData);
 });
 
 function renderLogs(data) {
@@ -252,7 +256,10 @@ function renderLogs(data) {
 
     const row = `
         <tr>
-            <td>${datePart}</td>
+            <td>
+              ${datePart}
+              <button class="btn-delete" onclick="deleteLog('${item.id}')"><i class="fa-solid fa-trash"></i></button>
+            </td>
             <td>${timePart}</td>
             <td style="${volumeStyle}">${volumeText}</td>
             <td>${activityBadge}</td>
@@ -372,4 +379,62 @@ function exportToExcel(data, filenameBase) {
 
   // Generate File Excel
   XLSX.writeFile(workbook, `${filenameBase}.xlsx`);
+}
+
+// --- ADMIN FEATURES ---
+// Check Session
+if (localStorage.getItem('isAdmin') === 'true') {
+  document.body.classList.add('is-admin');
+  showAdminDashboard(true);
+}
+
+function adminLogin() {
+  const user = document.getElementById('admin-user').value;
+  const pass = document.getElementById('admin-pass').value;
+
+  if (user === 'PengawasGenset' && pass === 'Pengawas') {
+    alert('Login Berhasil! Mode Admin Aktif.');
+    localStorage.setItem('isAdmin', 'true');
+    document.body.classList.add('is-admin');
+    showAdminDashboard(true);
+  } else {
+    alert('Username atau Password Salah!');
+  }
+}
+
+function adminLogout() {
+  localStorage.removeItem('isAdmin');
+  document.body.classList.remove('is-admin');
+  showAdminDashboard(false);
+  document.getElementById('admin-user').value = "";
+  document.getElementById('admin-pass').value = "";
+}
+
+function showAdminDashboard(isLoggedIn) {
+  const loginForm = document.getElementById('login-form');
+  const adminDash = document.getElementById('admin-dashboard');
+
+  if (isLoggedIn) {
+    loginForm.style.display = 'none';
+    adminDash.style.display = 'block';
+  } else {
+    loginForm.style.display = 'block';
+    adminDash.style.display = 'none';
+  }
+}
+
+function deleteHistory(id) {
+  if (confirm("Yakin ingin menghapus data riwayat ini?")) {
+    db.ref('/genset/history/' + id).remove()
+      .then(() => alert("Data terhapus!"))
+      .catch((e) => alert("Gagal hapus: " + e.message));
+  }
+}
+
+function deleteLog(id) {
+  if (confirm("Yakin ingin menghapus log ini?")) {
+    db.ref('/genset/logs/' + id).remove()
+      .then(() => alert("Log terhapus!"))
+      .catch((e) => alert("Gagal hapus: " + e.message));
+  }
 }

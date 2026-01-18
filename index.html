@@ -41,7 +41,7 @@
         <i class="fa-solid fa-file-lines"></i>
         <span>Riwayat</span>
       </button>
-      <button class="nav-item">
+      <button onclick="showPage('user')" id="btn-user" class="nav-item">
         <i class="fa-solid fa-users"></i>
         <span>Manajemen User</span>
       </button>
@@ -164,36 +164,67 @@
           </div>
         </div>
 
+        <div class="table-card" style="margin-top: 30px;">
+          <div class="table-header">
+            <h3 style="font-size: 1.1rem;">Log Perubahan Bahan Bakar (Real-time)</h3>
+          </div>
+
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Jam</th>
+                  <th>Perubahan Volume</th>
+                  <th>Jenis Aktivitas</th>
+                  <th>Status Sensor</th>
+                </tr>
+              </thead>
+              <tbody id="log-table-body">
+                <!-- Data akan dimuat dari Firebase -->
+                <tr>
+                  <td colspan="5" style="text-align: center;">Memuat data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="export-area">
+            <button class="btn-red" id="btn-export-logs" style="padding: 8px 20px; font-size: 0.9rem;">
+              <i class="fa-solid fa-download" style="margin-right: 8px;"></i> Unduh Log
+            </button>
+          </div>
+        </div>
       </div>
-      <div class="table-card" style="margin-top: 30px;">
-        <div class="table-header">
-          <h3 style="font-size: 1.1rem;">Log Perubahan Bahan Bakar (Real-time)</h3>
+
+      <!-- HALAMAN MANAJEMEN USER -->
+      <div id="user" class="page">
+        <div class="dashboard-header">
+          <h2>Manajemen User</h2>
+          <span>Admin Area</span>
         </div>
 
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th>Tanggal</th>
-                <th>Jam</th>
-                <th>Perubahan Volume</th>
-                <th>Jenis Aktivitas</th>
-                <th>Status Sensor</th>
-              </tr>
-            </thead>
-            <tbody id="log-table-body">
-              <!-- Data akan dimuat dari Firebase -->
-              <tr>
-                <td colspan="5" style="text-align: center;">Memuat data...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <div class="card" style="max-width: 500px; margin: 0 auto; margin-top: 50px;">
+          <div id="login-form">
+            <h3 style="text-align: center; margin-bottom: 20px;">Admin Login</h3>
+            <div class="form-group" style="margin-bottom: 15px;">
+              <label>Username</label>
+              <input type="text" id="admin-user" class="input-full" placeholder="Enter username">
+            </div>
+            <div class="form-group" style="margin-bottom: 25px;">
+              <label>Password</label>
+              <input type="password" id="admin-pass" class="input-full" placeholder="Enter password">
+            </div>
+            <button class="btn-red" style="width: 100%;" onclick="adminLogin()">Login</button>
+          </div>
 
-        <div class="export-area">
-          <button class="btn-red" id="btn-export-logs" style="padding: 8px 20px; font-size: 0.9rem;">
-            <i class="fa-solid fa-download" style="margin-right: 8px;"></i> Unduh Log
-          </button>
+          <div id="admin-dashboard" style="display: none; text-align: center;">
+            <i class="fa-solid fa-user-shield"
+              style="font-size: 3rem; color: var(--primary-red); margin-bottom: 15px;"></i>
+            <h3>Selamat Datang, Admin!</h3>
+            <p style="margin-bottom: 20px; color: #666;">Anda sekarang memiliki akses untuk menghapus data.</p>
+            <button class="btn-red" style="background: #333;" onclick="adminLogout()">Logout</button>
+          </div>
         </div>
       </div>
   </div>

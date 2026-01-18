@@ -342,6 +342,40 @@ td {
   font-size: 0.8rem;
 }
 
+/* INPUT STYLE */
+.input-full {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  /* Fix padding issue */
+}
+
+/* DELETE BUTTON STYLE */
+.btn-delete {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-left: 10px;
+  display: none;
+  /* Hidden by default */
+}
+
+.btn-delete:hover {
+  background: #c0392b;
+}
+
+/* Tampilkan tombol delete jika admin login */
+body.is-admin .btn-delete {
+  display: inline-block;
+}
+
 @media (max-width: 992px) {
   .cards-grid {
     grid-template-columns: 1fr;
