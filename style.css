@@ -350,27 +350,48 @@ td {
 
 @media (max-width: 768px) {
   header {
-    padding: 15px;
+    padding: 15px 20px;
     position: sticky;
     top: 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    /* Tambah shadow biar header lebih tegas */
+  }
+
+  .logo-area {
+    gap: 10px;
   }
 
   /* Tampilkan tombol hamburger */
   #btn-toggle-nav {
     display: block !important;
+    font-size: 1.3rem;
+    /* Sesuaikan ukuran icon */
+  }
+
+  .logo-area h1 {
+    font-size: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+    /* Cegah teks logo nabrak user icon */
   }
 
   /* Sidebar menjadi drawer (slide-in) */
   nav {
     position: fixed;
     top: 0;
-    left: -260px;
-    /* Sembunyi di kiri */
+    left: -280px;
+    /* Sembunyi lebih dalam */
     height: 100vh;
     z-index: 1000;
-    width: 260px;
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
-    transition: 0.3s ease-in-out;
+    width: 280px;
+    /* Lebar drawer diperbesar dikit */
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.5);
+    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Animasi lebih halus */
+    padding-top: 60px;
+    /* Ruang biar ga kena top status bar user kalau di app */
   }
 
   /* Class aktif untuk memunculkan sidebar */
@@ -385,9 +406,12 @@ td {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6);
+    /* Lebih gelap */
     z-index: 999;
     display: none;
+    backdrop-filter: blur(2px);
+    /* Efek blur di background */
     transition: 0.3s;
   }
 
@@ -396,49 +420,124 @@ td {
   }
 
   .nav-item {
-    font-size: 1.1rem;
-    /* Perbesar font menu di HP */
-    padding: 20px 25px;
+    font-size: 1rem;
+    padding: 20px 30px;
+    border-left: 4px solid transparent;
+    /* Indikator aktif di kiri */
+  }
+
+  .nav-item.active {
+    border-left-color: var(--primary-red);
+    background: rgba(255, 255, 255, 0.05);
   }
 
   .nav-item span {
     display: inline-block;
-    /* Pastikan teks muncul */
   }
 
-  /* Main content padding menyesuaikan */
+  /* Main content adjustments */
   main {
     padding: 20px 15px;
   }
 
-  .logo-area h1 {
+  /* Typo Adjustments untuk Mobile */
+  .dashboard-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-header span {
+    font-size: 0.9rem;
+    display: block;
+    margin-top: 5px;
+  }
+
+  .card {
+    padding: 20px;
+    /* Kurangi padding card */
+  }
+
+  .card-title {
     font-size: 1rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 200px;
+    margin-bottom: 20px;
+  }
+
+  /* Battery Card Optimizations */
+  .battery-container {
+    flex-direction: column;
+    /* Stack vertikal */
+    gap: 15px;
+    margin-top: 10px;
+  }
+
+  .battery-shape {
+    width: 80px;
+    /* Perkecil baterai */
+    height: 140px;
+    border-width: 6px;
+  }
+
+  .battery-shape::before {
+    width: 40px;
+    height: 10px;
+    top: -16px;
+  }
+
+  /* Area Teks Persentase & Status */
+  .battery-container>div:last-child {
+    text-align: center !important;
+    /* Paksa tengah */
+    width: 100%;
+  }
+
+  .percentage-text {
+    font-size: 3rem;
+    /* Perkecil font angka */
+    line-height: 1;
+    margin-bottom: 5px;
+  }
+
+  .status-label {
+    font-size: 1rem;
+  }
+
+  .status-val {
+    font-size: 1.1rem;
+    display: block;
+    /* Turun baris */
+    margin-top: 5px;
+  }
+
+  /* Parameter List Optimizations */
+  .param-item {
+    padding: 12px 0;
+    font-size: 0.95rem;
+    /* Font lebih kecil */
   }
 
   .filter-group {
     flex-direction: column;
     align-items: stretch;
+    gap: 15px;
+  }
+
+  .filter-group input,
+  .btn-red {
+    width: 100%;
+    /* Full width inputs/buttons */
+  }
+
+  .table-header {
+    padding: 15px 20px;
+  }
+
+  h3 {
+    font-size: 1rem !important;
   }
 
   .status-badge {
     white-space: nowrap;
-  }
-
-  /* Perkecil font persentase di HP */
-  .percentage-text {
-    font-size: 3.5rem;
-  }
-
-  .battery-shape {
-    width: 100px;
-    height: 160px;
-  }
-
-  .battery-container {
-    gap: 20px;
+    padding: 4px 8px;
+    /* Badge lebih compact */
+    font-size: 0.75rem;
   }
 }
