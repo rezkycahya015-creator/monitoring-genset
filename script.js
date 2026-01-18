@@ -290,14 +290,21 @@ function applyFilter() {
 function filterDataByDate(dataArray, startDateStr, endDateStr) {
   if (!startDateStr && !endDateStr) return dataArray; // No filter
 
-  const start = startDateStr ? new Date(startDateStr) : null;
-  const end = endDateStr ? new Date(endDateStr) : null;
-  // Set end date to end of day
-  if (end) end.setHours(23, 59, 59, 999);
+  let start = null;
+  if (startDateStr) {
+    const [sy, sm, sd] = startDateStr.split("-");
+    start = new Date(sy, sm - 1, sd); // Local Midnight
+  }
+
+  let end = null;
+  if (endDateStr) {
+    const [ey, em, ed] = endDateStr.split("-");
+    end = new Date(ey, em - 1, ed); // Local Midnight
+    end.setHours(23, 59, 59, 999); // End of Day
+  }
 
   return dataArray.filter(item => {
     // Asumsi item.tanggal format "DD/MM/YYYY HH:mm" atau "DD/MM/YYYY"
-    // Kita perlu parse manual karena format Indo
     if (!item.tanggal) return false;
 
     // Split date & time
@@ -305,6 +312,7 @@ function filterDataByDate(dataArray, startDateStr, endDateStr) {
     const [day, month, year] = datePart.split("/");
 
     // Create Date object (Month is 0-indexed)
+    // Ini creates Local Time
     const itemDate = new Date(year, month - 1, day);
 
     if (start && itemDate < start) return false;
