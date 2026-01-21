@@ -12,9 +12,9 @@
 #define WIFI_PASSWORD "password-iot" // Ganti dengan Password WiFi
 
 #define FIREBASE_HOST                                                          \
-  "iot-project-93719-default-rtdb.asia-southeast1.firebasedatabase.app" // Tanpa
+  "monitoring-9bffa-default-rtdb.asia-southeast1.firebasedatabase.app/" // Tanpa
                                                                         // https://
-#define FIREBASE_AUTH "rsGI2rrEWVSbaJ0AypsmjYCJKnzVgc6c5DSTCZZF"
+#define FIREBASE_AUTH "xmLz3TvFaWb3YZ8RWXjdlzfowdxQEv7GtAwDi0Z2"
 
 #define BOT_TOKEN                                                              \
   "8543325034:AAHijmifk4JSunOQU69ZW7vyCmXBYI5VOm4" // Token dari BotFather

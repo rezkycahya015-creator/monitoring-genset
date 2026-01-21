@@ -45,14 +45,14 @@ function closeSidebar() {
 
 // --- CONFIG FIREBASE ---
 const firebaseConfig = {
-  apiKey: "AIzaSyD4edL-s3i0Sffk7es00Gm1AUv8Y7Oorgw",
-  authDomain: "iot-project-93719.firebaseapp.com",
-  databaseURL:
-    "https://iot-project-93719-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "iot-project-93719",
-  storageBucket: "iot-project-93719.firebasestorage.app",
-  messagingSenderId: "579950021426",
-  appId: "1:579950021426:web:cd47cf9aaa60eab8b7252b",
+  apiKey: "AIzaSyAnfF_Cs_wwyGaqB9Z91RwR9Fv7AR0jk2Y",
+  authDomain: "monitoring-9bffa.firebaseapp.com",
+  databaseURL: "https://monitoring-9bffa-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "monitoring-9bffa",
+  storageBucket: "monitoring-9bffa.firebasestorage.app",
+  messagingSenderId: "893322341036",
+  appId: "1:893322341036:web:e9a4c298dc41a73ca10d09",
+  measurementId: "G-92ZKF4PY4J"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -275,7 +275,7 @@ function renderLogs(data) {
 btnFilter.addEventListener("click", applyFilter);
 
 function applyFilter() {
-  const startVal = startDateInput.value; // YYYY-MM-DD
+  const startVal = startDateInput.value; // YYYY-MM-DD 
   const endVal = endDateInput.value;     // YYYY-MM-DD
 
   // Filter Data Riwayat
