@@ -1,0 +1,21 @@
+/* Fix Export and Delete Buttons on Mobile */
+@media (max-width: 768px) {
+    .export-area {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .export-area button {
+        width: 100%;
+        margin: 0 !important;
+        /* Reset any margins */
+    }
+
+    .btn-bulk-delete {
+        width: 100%;
+        /* Ensure full width like btn-red */
+        text-align: center;
+        justify-content: center;
+    }
+}
