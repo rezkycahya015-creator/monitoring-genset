@@ -176,8 +176,11 @@ function renderRiwayat(data) {
   data.forEach((item) => {
     const row = `
       <tr>
-        <td>
-           ${item.tanggal || "-"}
+        <td class="admin-only-col check-col">
+            <input type="checkbox" class="admin-checkbox riwayat-check" value="${item.id}">
+        </td>
+        <td class="date-cell">
+           <span>${item.tanggal || "-"}</span>
            <button class="btn-delete" onclick="deleteHistory('${item.id}')"><i class="fa-solid fa-trash"></i></button>
         </td>
         <td>${item.jam_nyala || "-"}</td>
@@ -256,8 +259,11 @@ function renderLogs(data) {
 
     const row = `
         <tr>
-            <td>
-              ${datePart}
+            <td class="admin-only-col check-col">
+                <input type="checkbox" class="admin-checkbox logs-check" value="${item.id}">
+            </td>
+            <td class="date-cell">
+              <span>${datePart}</span>
               <button class="btn-delete" onclick="deleteLog('${item.id}')"><i class="fa-solid fa-trash"></i></button>
             </td>
             <td>${timePart}</td>
@@ -285,6 +291,20 @@ function applyFilter() {
   // Filter Data Logs
   const filteredLogs = filterDataByDate(fuelLogData, startVal, endVal);
   renderLogs(filteredLogs);
+
+
+  // Toggle Expanded Class
+  const isFiltered = startVal !== "" || endVal !== "";
+  const riwayatContainer = document.getElementById("riwayat-container");
+  const logsContainer = document.getElementById("logs-container");
+
+  if (isFiltered) {
+    riwayatContainer.classList.add("expanded");
+    logsContainer.classList.add("expanded");
+  } else {
+    riwayatContainer.classList.remove("expanded");
+    logsContainer.classList.remove("expanded");
+  }
 }
 
 function filterDataByDate(dataArray, startDateStr, endDateStr) {
@@ -444,5 +464,40 @@ function deleteLog(id) {
     db.ref('/genset/logs/' + id).remove()
       .then(() => alert("Log terhapus!"))
       .catch((e) => alert("Gagal hapus: " + e.message));
+  }
+}
+
+// --- BULK DELETE FEATURES ---
+function toggleSelectAll(type) {
+  const masterCheck = document.getElementById(type === 'riwayat' ? 'check-all-riwayat' : 'check-all-logs');
+  const checkboxes = document.querySelectorAll(type === 'riwayat' ? '.riwayat-check' : '.logs-check');
+
+  checkboxes.forEach(cb => cb.checked = masterCheck.checked);
+}
+
+function deleteSelected(type) {
+  const checkboxes = document.querySelectorAll(type === 'riwayat' ? '.riwayat-check:checked' : '.logs-check:checked');
+
+  if (checkboxes.length === 0) {
+    alert("Pilih data yang ingin dihapus terlebih dahulu.");
+    return;
+  }
+
+  if (confirm(`Yakin ingin menghapus ${checkboxes.length} data terpilih?`)) {
+    const dbPath = type === 'riwayat' ? '/genset/history/' : '/genset/logs/';
+    let promises = [];
+
+    checkboxes.forEach(cb => {
+      promises.push(db.ref(dbPath + cb.value).remove());
+    });
+
+    Promise.all(promises)
+      .then(() => {
+        alert("Berhasil menghapus " + checkboxes.length + " data.");
+        // Uncheck master checkbox
+        const masterCheck = document.getElementById(type === 'riwayat' ? 'check-all-riwayat' : 'check-all-logs');
+        if (masterCheck) masterCheck.checked = false;
+      })
+      .catch((e) => alert("Terjadi kesalahan: " + e.message));
   }
 }

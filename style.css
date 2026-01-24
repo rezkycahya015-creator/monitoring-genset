@@ -595,3 +595,118 @@ body.is-admin .btn-delete {
     border-radius: 8px;
   }
 }
+
+/* --- TABLE SCROLL & STICKY HEADER --- */
+/* Override default table-responsive behavior for fixed height */
+.table-scrollable {
+  max-height: 400px;
+  /* Base height */
+  overflow-y: auto;
+  display: block;
+}
+
+/* Expanded state when filter is active */
+.table-scrollable.expanded {
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Sticky Header */
+.table-scrollable th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #f8f9fa;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Checkbox Column Style */
+.check-col {
+  width: 40px;
+  text-align: center;
+}
+
+/* Bulk Delete Button Area */
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Hide checkboxes by default, show for admin */
+.admin-only-col,
+.admin-checkbox {
+  display: none;
+}
+
+body.is-admin .admin-only-col {
+  display: table-cell;
+}
+
+body.is-admin .admin-checkbox {
+  display: inline-block;
+}
+
+.btn-bulk-delete {
+  background: #c0392b;
+  color: white;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  display: none;
+  font-size: 0.9rem;
+}
+
+body.is-admin .btn-bulk-delete {
+  display: inline-block;
+}
+
+/* --- TABLE SCROLL FIXES (6 Rows) --- */
+/* Assuming ~50-55px per row + header, 6 rows would be around 350-380px */
+.table-scrollable {
+  max-height: 380px !important;
+}
+
+/* Ensure admin elements are hidden by default and only shown when connected */
+.admin-only-col,
+.admin-checkbox,
+.btn-bulk-delete,
+.btn-delete {
+  display: none !important;
+}
+
+/* ONLY display when body has is-admin class */
+body.is-admin .admin-only-col {
+  display: table-cell !important;
+}
+
+body.is-admin .admin-checkbox {
+  display: inline-block !important;
+}
+
+body.is-admin .btn-bulk-delete,
+body.is-admin .btn-delete {
+  display: inline-block !important;
+}
+
+/* --- Date Cell & Delete Button Alignment --- */
+.date-cell {
+  /* Use Flexbox to align text and button */
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  /* Push button to right if needed, or stick to left */
+  gap: 10px;
+  white-space: nowrap !important;
+  /* Prevent text wrapping */
+  min-width: 180px;
+  /* Ensure enough space */
+}
+
+.btn-delete {
+  flex-shrink: 0;
+  /* Button should never shrink */
+  margin-left: auto;
+  /* Push to the right edge */
+}
