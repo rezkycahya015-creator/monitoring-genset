@@ -58,6 +58,64 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// --- STATE MANAGEMENT MULTI-DEVICE ---
+let currentDeviceId = null;
+const deviceSelect = document.getElementById("device-select");
+
+// 1. Fetch Daftar Device saat Load
+function loadDevices() {
+  db.ref("/devices").once("value").then(snapshot => {
+    const devices = snapshot.val();
+    deviceSelect.innerHTML = ""; // Clear existing
+
+    if (devices) {
+      const deviceIds = Object.keys(devices);
+
+      // Populate Dropdown
+      deviceIds.forEach(id => {
+        const option = document.createElement("option");
+        option.value = id;
+        option.text = id; // Bisa diganti alias jika ada
+        deviceSelect.appendChild(option);
+      });
+
+      // Auto-select first device
+      if (deviceIds.length > 0) {
+        switchDevice(deviceIds[0]);
+        deviceSelect.value = deviceIds[0];
+      }
+    } else {
+      deviceSelect.innerHTML = `<option>Tidak ada device</option>`;
+      alert("Tidak ada data device ditemukan di database.");
+    }
+  });
+}
+
+// Event Listener Dropdown
+deviceSelect.addEventListener("change", (e) => {
+  switchDevice(e.target.value);
+});
+
+// Fungsi Ganti Device (Detach Listener Lama & Attach Listener Baru)
+function switchDevice(deviceId) {
+  if (currentDeviceId) {
+    // Detach listener lama
+    db.ref(`/devices/${currentDeviceId}/data/volume`).off();
+    db.ref(`/devices/${currentDeviceId}/data/tinggi`).off();
+    db.ref(`/devices/${currentDeviceId}/data/history`).off();
+    db.ref(`/devices/${currentDeviceId}/data/logs`).off();
+  }
+
+  currentDeviceId = deviceId;
+  console.log("Switched to Device:", currentDeviceId);
+
+  // Attach Listener Baru
+  attachListeners(currentDeviceId);
+}
+
+// Panggil saat main
+loadDevices();
+
 // --- LOGIC UI DASHBOARD ---
 const batteryFill = document.getElementById("battery-fill");
 const percVal = document.getElementById("perc-val");
@@ -113,15 +171,34 @@ function updateUI(volume) {
   statusText.style.color = color;
 }
 
-db.ref("/genset/volume").on("value", (snapshot) => {
-  const val = snapshot.val();
-  if (val !== null) updateUI(val);
-});
 
-db.ref("/genset/tinggi").on("value", (snapshot) => {
-  const val = snapshot.val();
-  if (val !== null) pTinggi.innerText = val + " CM";
-});
+
+// --- FUNGSI LISTENER DINAMIS ---
+function attachListeners(deviceId) {
+  const basePath = `/devices/${deviceId}/data`;
+
+  // 1. REALTIME VOLUME
+  db.ref(`${basePath}/volume`).on("value", (snapshot) => {
+    const val = snapshot.val();
+    if (val !== null) updateUI(val);
+  });
+
+  // 2. REALTIME TINGGI
+  db.ref(`${basePath}/tinggi`).on("value", (snapshot) => {
+    const val = snapshot.val();
+    if (val !== null) pTinggi.innerText = val + " CM";
+  });
+
+  // 3. RIWAYAT OP
+  db.ref(`${basePath}/history`).on("value", (snapshot) => {
+    handleHistoryData(snapshot.val());
+  });
+
+  // 4. LOGS
+  db.ref(`${basePath}/logs`).on("value", (snapshot) => {
+    handleLogsData(snapshot.val());
+  });
+}
 
 // --- LOGIKA REAL-TIME & HISTORY ---
 
@@ -140,8 +217,8 @@ const btnExportRiwayat = document.getElementById("btn-export-riwayat");
 const btnExportLogs = document.getElementById("btn-export-logs");
 
 // 1. DATA RIWAYAT OPERASIONAL (Fetch from /genset/history)
-db.ref("/genset/history").on("value", (snapshot) => {
-  const data = snapshot.val();
+// 1. DATA RIWAYAT OPERASIONAL (Handler Baru)
+function handleHistoryData(data) {
   operationalHistoryData = []; // Reset
 
   if (data) {
@@ -162,7 +239,7 @@ db.ref("/genset/history").on("value", (snapshot) => {
   }
 
   renderRiwayat(operationalHistoryData);
-});
+}
 
 // Render Fungsi Riwayat
 function renderRiwayat(data) {
@@ -195,8 +272,8 @@ function renderRiwayat(data) {
 
 
 // 2. DATA LOG PERUBAHAN BAHAN BAKAR (PERSISTENT /genset/logs)
-db.ref("/genset/logs").on("value", (snapshot) => {
-  const data = snapshot.val();
+// 2. DATA LOG PERUBAHAN BAHAN BAKAR (Handler Baru)
+function handleLogsData(data) {
   fuelLogData = [];
 
   if (data) {
@@ -214,7 +291,7 @@ db.ref("/genset/logs").on("value", (snapshot) => {
 
   // Render Logs
   renderLogs(fuelLogData);
-});
+}
 
 function renderLogs(data) {
   logTableBody.innerHTML = "";
@@ -453,7 +530,8 @@ function showAdminDashboard(isLoggedIn) {
 
 function deleteHistory(id) {
   if (confirm("Yakin ingin menghapus data riwayat ini?")) {
-    db.ref('/genset/history/' + id).remove()
+    if (!currentDeviceId) return;
+    db.ref(`/devices/${currentDeviceId}/data/history/` + id).remove()
       .then(() => alert("Data terhapus!"))
       .catch((e) => alert("Gagal hapus: " + e.message));
   }
@@ -461,7 +539,8 @@ function deleteHistory(id) {
 
 function deleteLog(id) {
   if (confirm("Yakin ingin menghapus log ini?")) {
-    db.ref('/genset/logs/' + id).remove()
+    if (!currentDeviceId) return;
+    db.ref(`/devices/${currentDeviceId}/data/logs/` + id).remove()
       .then(() => alert("Log terhapus!"))
       .catch((e) => alert("Gagal hapus: " + e.message));
   }
@@ -484,7 +563,8 @@ function deleteSelected(type) {
   }
 
   if (confirm(`Yakin ingin menghapus ${checkboxes.length} data terpilih?`)) {
-    const dbPath = type === 'riwayat' ? '/genset/history/' : '/genset/logs/';
+    if (!currentDeviceId) return;
+    const dbPath = type === 'riwayat' ? `/devices/${currentDeviceId}/data/history/` : `/devices/${currentDeviceId}/data/logs/`;
     let promises = [];
 
     checkboxes.forEach(cb => {
