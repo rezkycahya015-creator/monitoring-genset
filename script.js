@@ -18,6 +18,8 @@ function showPage(pageId) {
     document.getElementById("btn-riwayat").classList.add("active");
   if (pageId === "user")
     document.getElementById("btn-user").classList.add("active");
+  if (pageId === "config")
+    document.getElementById("btn-config").classList.add("active");
 
   // Tutup sidebar jika di mobile setelah pindah halaman
   closeSidebar();
@@ -109,8 +111,14 @@ function switchDevice(deviceId) {
   currentDeviceId = deviceId;
   console.log("Switched to Device:", currentDeviceId);
 
-  // Attach Listener Baru
-  attachListeners(currentDeviceId);
+  // FETCH CONFIG FIRST, THEN ATTACH LISTENERS
+  db.ref(`/devices/${deviceId}/config`).once("value").then(snapshot => {
+    currentDeviceConfig = snapshot.val();
+    console.log("Config Loaded:", currentDeviceConfig);
+
+    // Attach Listener Baru SETELAH config loaded
+    attachListeners(currentDeviceId);
+  });
 }
 
 // Panggil saat main
@@ -126,16 +134,38 @@ const pTinggi = document.getElementById("p-tinggi");
 const pVolume = document.getElementById("p-volume");
 const pEstimasi = document.getElementById("p-estimasi");
 
+// --- CONFIGURATION STATE ---
+let currentDeviceConfig = null;
+
 function updateUI(volume) {
-  const maxVolume = 440;
+  // Wrapper
+  currentVol = volume;
+  renderDashboard();
+  return;
+  /* Old Logic Removed */
+  let maxVolume = 440; // Default fallback
+
+  if (currentDeviceConfig && currentDeviceConfig.tank) {
+    const { length, width, height } = currentDeviceConfig.tank;
+    if (length > 0 && width > 0 && height > 0) {
+      maxVolume = (length * width * height) / 1000.0;
+    }
+  }
+
   let percentage = Math.round((volume / maxVolume) * 100);
   if (percentage > 100) percentage = 100;
+  if (percentage < 0) percentage = 0;
 
   percVal.innerText = percentage + "%";
   pVolume.innerText = volume.toFixed(1) + " L";
 
-  // Hitung Estimasi (85 Liter/Jam)
-  const hours = volume / 85;
+  // Hitung Estimasi (Based on Config Engine LPH)
+  let lph = 20; // Default
+  if (currentDeviceConfig && currentDeviceConfig.engine && currentDeviceConfig.engine.consumption_lph) {
+    lph = currentDeviceConfig.engine.consumption_lph;
+  }
+
+  const hours = volume / lph;
   // Konversi ke Jam & Menit
   const jam = Math.floor(hours);
   const menit = Math.round((hours - jam) * 60);
@@ -158,6 +188,10 @@ function updateUI(volume) {
     color = "#e67e22";
     status = "Waspada";
     alertBar.style.display = "none";
+  } else if (percentage >= 20) {
+    color = "#e67e22";
+    status = "Menipis";
+    alertBar.style.display = "none";
   } else {
     color = "#e74c3c";
     status = "Bahaya";
@@ -174,19 +208,28 @@ function updateUI(volume) {
 
 
 // --- FUNGSI LISTENER DINAMIS ---
+let currentVol = 0;
+let currentH = 0;
+
 function attachListeners(deviceId) {
   const basePath = `/devices/${deviceId}/data`;
 
   // 1. REALTIME VOLUME
   db.ref(`${basePath}/volume`).on("value", (snapshot) => {
     const val = snapshot.val();
-    if (val !== null) updateUI(val);
+    if (val !== null) {
+      currentVol = val;
+      renderDashboard();
+    }
   });
 
   // 2. REALTIME TINGGI
   db.ref(`${basePath}/tinggi`).on("value", (snapshot) => {
     const val = snapshot.val();
-    if (val !== null) pTinggi.innerText = val + " CM";
+    if (val !== null) {
+      currentH = val;
+      renderDashboard();
+    }
   });
 
   // 3. RIWAYAT OP
@@ -198,6 +241,110 @@ function attachListeners(deviceId) {
   db.ref(`${basePath}/logs`).on("value", (snapshot) => {
     handleLogsData(snapshot.val());
   });
+}
+
+function renderDashboard() {
+  // STRICT LOGIC FROM USER REQUEST:
+  // 1. Tinggi Bahan Bakar = Tinggi Tangki - Jarak Sensor (This is `currentH` from firmware)
+  // 2. Volume = Calculated from Height vs Tank Dimensions
+  // 3. Estimate = Volume / LPH
+  // 4. Blind Spot < 20cm => 100% Percentage
+
+  // Default Config if missing
+  let cfgLength = 100;
+  let cfgWidth = 100;
+  let cfgHeight = 100; // Tank Height
+  let cfgLPH = 20;
+
+  if (currentDeviceConfig) {
+    if (currentDeviceConfig.tank) {
+      if (currentDeviceConfig.tank.length) cfgLength = currentDeviceConfig.tank.length;
+      if (currentDeviceConfig.tank.width) cfgWidth = currentDeviceConfig.tank.width;
+      if (currentDeviceConfig.tank.height) cfgHeight = currentDeviceConfig.tank.height;
+    }
+    if (currentDeviceConfig.engine && currentDeviceConfig.engine.consumption_lph) {
+      cfgLPH = currentDeviceConfig.engine.consumption_lph;
+    }
+  }
+
+  // Calculate Max Volume
+  const maxVolume = (cfgLength * cfgWidth * cfgHeight) / 1000.0;
+
+  // Render Height
+  pTinggi.innerText = currentH + " CM";
+
+  // Calculate Volume based on Height (Strictly)
+  // Volume = L * W * FuelHeight
+  let calcVolume = (cfgLength * cfgWidth * currentH) / 1000.0;
+
+  // Use firmware volume if available as primary source, OR force calculated?
+  // User said "liter/volume baan bakar didapat dari tinggi bahan bakar terhadap volume tanki"
+  // If firmware sends volume, it uses the same formula.
+  // EXCEPT for blind spot.
+
+  // Blind Spot Logic: Distance < 20cm => 100%
+  // Distance = TankHeight - FuelHeight
+  const distance = cfgHeight - currentH;
+
+  let percentage = 0;
+
+  if (distance < 23 && distance >= 0) {
+    // Blind Spot Handling -> Force 100%
+    percentage = 100;
+    // Force volume to max
+    calcVolume = maxVolume;
+  } else {
+    percentage = Math.round((calcVolume / maxVolume) * 100);
+  }
+
+  // Clamp
+  if (percentage > 100) percentage = 100;
+  if (percentage < 0) percentage = 0;
+
+  // Update UI Text
+  percVal.innerText = percentage + "%";
+  pVolume.innerText = calcVolume.toFixed(1) + " L";
+
+  // Estimate
+  const hours = calcVolume / cfgLPH;
+  const jam = Math.floor(hours);
+  const menit = Math.round((hours - jam) * 60);
+  pEstimasi.innerText = `± ${jam} Jam ${menit} Menit`;
+
+  // Battery Visual
+  batteryFill.style.height = `calc(${percentage}% - 10px)`;
+
+  // Status & Color
+  let color = "";
+  let status = "";
+
+  if (percentage >= 80) {
+    color = "#2ecc71";
+    status = "Sangat Aman";
+    alertBar.style.display = "none";
+  } else if (percentage >= 60) {
+    color = "#f1c40f";
+    status = "Cukup";
+    alertBar.style.display = "none";
+  } else if (percentage >= 40) {
+    color = "#e67e22";
+    status = "Waspada";
+    alertBar.style.display = "none";
+  } else if (percentage >= 20) {
+    color = "#e67e22";
+    status = "Menipis";
+    alertBar.style.display = "none";
+  } else {
+    color = "#e74c3c";
+    status = "Bahaya";
+    alertBar.style.display = "flex";
+    alertPerc.innerText = percentage;
+  }
+
+  batteryFill.style.backgroundColor = color;
+  percVal.style.color = color;
+  statusText.innerText = status;
+  statusText.style.color = color;
 }
 
 // --- LOGIKA REAL-TIME & HISTORY ---
@@ -518,13 +665,25 @@ function adminLogout() {
 function showAdminDashboard(isLoggedIn) {
   const loginForm = document.getElementById('login-form');
   const adminDash = document.getElementById('admin-dashboard');
+  const btnConfig = document.getElementById('btn-config');
 
   if (isLoggedIn) {
     loginForm.style.display = 'none';
     adminDash.style.display = 'block';
+
+    // Show Config Button for Admin
+    if (btnConfig) btnConfig.style.display = 'flex';
   } else {
     loginForm.style.display = 'block';
     adminDash.style.display = 'none';
+
+    // Hide Config Button for Non-Admin
+    if (btnConfig) btnConfig.style.display = 'none';
+
+    // If currently on config page, redirect to dashboard
+    if (document.getElementById('config').classList.contains('active')) {
+      showPage('dashboard');
+    }
   }
 }
 
@@ -580,4 +739,264 @@ function deleteSelected(type) {
       })
       .catch((e) => alert("Terjadi kesalahan: " + e.message));
   }
+} // Close deleteSelected function
+
+// --- 6. KONFIGURASI ALAT (WAITING ROOM & PROVISIONING) ---
+const waitingRoomList = document.getElementById("waiting-room-list");
+const configTableBody = document.getElementById("config-table-body");
+const configModal = document.getElementById("config-modal");
+const modalDeviceId = document.getElementById("modal-device-id");
+
+// Listen ke seluruh devices untuk memisahkan Pending vs Active
+db.ref("/devices").on("value", (snapshot) => {
+  const data = snapshot.val();
+  if (!data) return;
+
+  const devices = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+
+  // 1. Filter Waiting Room (isActive != true)
+  // STRICT FILTER: Hanya muncul jika isActive FALSE atau UNDEFINED
+  const pendingDevices = devices.filter(d => !d.config || d.config.isActive !== true);
+  if (waitingRoomList) renderWaitingRoom(pendingDevices);
+
+  // 2. Filter Active Devices (isActive == true)
+  // STRICT FILTER: Hanya muncul jika isActive TRUE
+  const activeDevices = devices.filter(d => d.config && d.config.isActive === true);
+  if (configTableBody) renderConfigTable(activeDevices);
+
+  // Update Dropdown di Header agar SINKRON dengan Strict Filter
+  updateDeviceDropdown(activeDevices);
+});
+
+function updateDeviceDropdown(activeDevices) {
+  if (!deviceSelect) return;
+  deviceSelect.innerHTML = "";
+  if (activeDevices.length === 0) {
+    deviceSelect.innerHTML = `<option>Tidak ada device aktif</option>`;
+    return;
+  }
+
+  activeDevices.forEach(d => {
+    const option = document.createElement("option");
+    option.value = d.id;
+    option.text = (d.config && d.config.alias) ? d.config.alias : d.id;
+    deviceSelect.appendChild(option);
+  });
+
+  // Pertahankan seleksi jika masih valid
+  if (currentDeviceId && activeDevices.find(d => d.id === currentDeviceId)) {
+    deviceSelect.value = currentDeviceId;
+  } else if (activeDevices.length > 0) {
+    // Auto select first available if current invalid
+    switchDevice(activeDevices[0].id);
+    deviceSelect.value = activeDevices[0].id;
+  }
+}
+
+function renderWaitingRoom(devices) {
+  waitingRoomList.innerHTML = "";
+  if (devices.length === 0) {
+    waitingRoomList.innerHTML = `<p style="color: #999; margin-left: 10px;">Tidak ada perangkat baru menunggu konfigurasi.</p>`;
+    return;
+  }
+
+  devices.forEach(d => {
+    const card = document.createElement("div");
+    card.className = "card card-pending";
+
+    card.innerHTML = `
+      <div class="new-tag">New</div>
+      <h3 style="margin-top: 20px;">${d.id}</h3>
+      <p>Device is online but not configured.</p>
+      <div style="display: flex; gap: 10px; width: 100%;">
+        <button class="btn-red" style="flex: 1;" onclick="openConfigModal('${d.id}')">
+          <i class="fa-solid fa-screwdriver-wrench"></i> Configure
+        </button>
+        <button class="btn-delete-icon" onclick="deleteDevice('${d.id}')" title="Delete Device">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </div>
+    `;
+    waitingRoomList.appendChild(card);
+  });
+}
+
+function renderConfigTable(devices) {
+  configTableBody.innerHTML = "";
+  if (devices.length === 0) {
+    configTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Belum ada perangkat terdaftar.</td></tr>`;
+    return;
+  }
+
+  devices.forEach(d => {
+    const conf = d.config || {};
+    const dim = conf.tank ? `${conf.tank.length}x${conf.tank.width}x${conf.tank.height} cm` : "-";
+
+    const row = `
+      <tr>
+        <td style="font-weight: bold;">${d.id}</td>
+        <td>${conf.alias || "-"}</td>
+        <td>${dim}</td>
+        <td>${conf.engine ? conf.engine.consumption_lph + " L/Jam" : "-"}</td>
+        <td><span class="badge-active">Aktif</span></td>
+        <td>
+           <button class="btn-edit" onclick="openConfigModal('${d.id}')">
+             <i class="fa-solid fa-pen"></i> Edit
+           </button>
+           <button class="btn-delete-icon" onclick="deleteDevice('${d.id}')">
+             <i class="fa-solid fa-trash"></i>
+           </button>
+        </td>
+      </tr>
+    `;
+    configTableBody.innerHTML += row;
+  });
+}
+
+// --- DELETE LOGIC ---
+function deleteDevice(deviceId) {
+  if (confirm(`Apakah Anda yakin MENGHAPUS permanen perangkat ${deviceId}? Data tidak bisa dikembalikan.`)) {
+    db.ref("/devices/" + deviceId).remove()
+      .then(() => {
+        alert("Perangkat berhasil dihapus.");
+        // UI updates automatically via on("value") listener
+      })
+      .catch((error) => {
+        alert("Gagal menghapus: " + error.message);
+      });
+  }
+}
+
+// --- MODAL LOGIC ---
+
+let editingDeviceId = null;
+
+function openConfigModal(deviceId) {
+  editingDeviceId = deviceId;
+  modalDeviceId.innerText = "Device ID: " + deviceId;
+  configModal.style.display = "block";
+
+  // Pre-fill data jika ada
+  db.ref(`/devices/${deviceId}/config`).once("value").then(snapshot => {
+    const conf = snapshot.val();
+    if (conf) {
+      document.getElementById("cfg-alias").value = conf.alias || "";
+      if (conf.tank) {
+        document.getElementById("cfg-length").value = conf.tank.length || "";
+        document.getElementById("cfg-width").value = conf.tank.width || "";
+        document.getElementById("cfg-height").value = conf.tank.height || "";
+      }
+      if (conf.engine) {
+        document.getElementById("cfg-lph").value = conf.engine.consumption_lph || "";
+      }
+      if (conf.telegram) {
+        document.getElementById("cfg-token").value = conf.telegram.bot_token || "";
+        document.getElementById("cfg-chatid").value = conf.telegram.chat_id || "";
+      }
+      if (conf.wifi) {
+        document.getElementById("cfg-ssid").value = conf.wifi.ssid || "";
+        document.getElementById("cfg-pass").value = conf.wifi.pass || "";
+      }
+      if (conf.ethernet) {
+        document.getElementById("cfg-eth-enable").checked = conf.ethernet.enable || false;
+        document.getElementById("cfg-eth-static").checked = conf.ethernet.static || false;
+        document.getElementById("cfg-eth-ip").value = conf.ethernet.ip || "";
+        document.getElementById("cfg-eth-gateway").value = conf.ethernet.gateway || "";
+        document.getElementById("cfg-eth-subnet").value = conf.ethernet.subnet || "";
+        document.getElementById("cfg-eth-dns1").value = conf.ethernet.dns1 || "";
+        document.getElementById("cfg-eth-dns2").value = conf.ethernet.dns2 || "";
+        toggleStaticIP();
+      }
+    } else {
+      // Reset form
+      document.getElementById("config-form").reset();
+    }
+  });
+
+  // Fetch & Display Network Status (Read-Only)
+  db.ref(`/devices/${deviceId}/status`).once("value").then(snapshot => {
+    const status = snapshot.val();
+    if (status) {
+      document.getElementById("stat-ssid").value = status.ssid || "-";
+      document.getElementById("stat-ip").value = status.ip_address || "-";
+      document.getElementById("stat-rssi").value = (status.rssi || "0") + " dBm";
+      document.getElementById("stat-last-online").innerText = "Last Online: " + (status.last_online || "N/A");
+    } else {
+      document.getElementById("stat-ssid").value = "Offline";
+      document.getElementById("stat-ip").value = "-";
+      document.getElementById("stat-rssi").value = "-";
+      document.getElementById("stat-last-online").innerText = "";
+    }
+  });
+}
+
+function closeConfigModal() {
+  configModal.style.display = "none";
+  editingDeviceId = null;
+}
+
+// Close modal if click outside
+window.onclick = function (event) {
+  if (event.target == configModal) {
+    closeConfigModal();
+  }
+}
+
+// --- ETHERNET TOGGLE ---
+function toggleStaticIP() {
+  const isChecked = document.getElementById("cfg-eth-static").checked;
+  const fields = document.getElementById("eth-static-fields");
+  fields.style.display = isChecked ? "block" : "none";
+}
+
+function saveConfig(e) {
+  e.preventDefault();
+  if (!editingDeviceId) return;
+
+  // Simple Validation
+  if (!document.getElementById("cfg-alias").value || !document.getElementById("cfg-lph").value) {
+    alert("Harap isi Alias dan Konsumsi BBM!");
+    return;
+  }
+
+  alert("Menyimpan konfigurasi... Perangkat akan di-update.");
+
+  const configData = {
+    isActive: true, // Mark as active
+    alias: document.getElementById("cfg-alias").value,
+    tank: {
+      length: parseFloat(document.getElementById("cfg-length").value) || 0,
+      width: parseFloat(document.getElementById("cfg-width").value) || 0,
+      height: parseFloat(document.getElementById("cfg-height").value) || 0
+    },
+    engine: {
+      consumption_lph: parseFloat(document.getElementById("cfg-lph").value) || 0
+    },
+    wifi: {
+      ssid: document.getElementById("cfg-ssid").value,
+      pass: document.getElementById("cfg-pass").value
+    },
+    ethernet: {
+      enable: document.getElementById("cfg-eth-enable").checked,
+      static: document.getElementById("cfg-eth-static").checked,
+      ip: document.getElementById("cfg-eth-ip").value,
+      gateway: document.getElementById("cfg-eth-gateway").value,
+      subnet: document.getElementById("cfg-eth-subnet").value,
+      dns1: document.getElementById("cfg-eth-dns1").value,
+      dns2: document.getElementById("cfg-eth-dns2").value
+    },
+    telegram: {
+      bot_token: document.getElementById("cfg-token").value,
+      chat_id: document.getElementById("cfg-chatid").value
+    }
+  };
+
+  db.ref(`/devices/${editingDeviceId}/config`).update(configData)
+    .then(() => {
+      alert("Berhasil! Alat telah dikonfigurasi.");
+      closeConfigModal();
+    })
+    .catch((err) => {
+      alert("Error: " + err.message);
+    });
 }

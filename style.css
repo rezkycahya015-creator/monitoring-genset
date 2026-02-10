@@ -91,6 +91,10 @@ main {
 }
 
 /* CSS UNTUK PINDAH HALAMAN */
+#btn-config {
+  display: none;
+}
+
 .page {
   display: none;
 }
@@ -718,9 +722,389 @@ body.is-admin .btn-delete {
   /* Ensure enough space */
 }
 
-.btn-delete {
-  flex-shrink: 0;
-  /* Button should never shrink */
-  margin-left: auto;
-  /* Push to the right edge */
+/* --- CONFIG PAGE & MODAL STYLES --- */
+
+/* Badge Styles */
+.badge-pending {
+  background: #fff3e0;
+  color: #e67e22;
+  border: 1px solid #ffe0b2;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.badge-active {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s;
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: 10% auto;
+  padding: 30px;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 600px;
+  position: relative;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s;
+}
+
+.close-btn {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.close-btn:hover,
+.close-btn:focus {
+  color: #000;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* Waiting Room Card Style */
+/* Waiting Room Card Style - Enhanced */
+/* Waiting Room Card Style - Enhanced */
+/* Waiting Room Card Style - Enhanced */
+.card-pending {
+  background: #ffffff;
+  border: 1px solid #f1c40f;
+  /* Full Yellow Border */
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  /* Subtle shadow */
+  padding: 20px;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.card-pending:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.new-tag {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #f1c40f;
+  /* Yellow Background */
+  color: #fff;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  font-weight: 700;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-pending h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.card-pending p {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+
+.card-pending .btn-red {
+  width: 100%;
+  justify-content: center;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  background-color: #e74c3c;
+  /* Red Button */
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.card-pending .btn-red:hover {
+  background-color: #c0392b;
+}
+
+
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0
+  }
+
+  to {
+    opacity: 1
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Action Buttons in Table */
+.btn-edit {
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  margin-right: 5px;
+  transition: background 0.2s;
+}
+
+.btn-edit:hover {
+  background: #2980b9;
+}
+
+.btn-delete-icon {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-delete-icon:hover {
+  background: #c0392b;
+}
+
+/* Adjust card button for flex layout */
+.card-pending .btn-red {
+  font-size: 0.9rem;
+  /* Slightly smaller text to fit with trash icon */
+}
+
+/* Media Queries for Mobile Responsiveness */
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 20% auto;
+    width: 95%;
+    padding: 20px;
+  }
+}
+
+/* --- CONFIGURATION MODAL STYLES (NEW) --- */
+.modal-header__new {
+  margin-bottom: 25px;
+}
+
+.modal-header__new h2 {
+  color: #e74c3c;
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #2c3e50;
+  font-size: 0.95rem;
+}
+
+/* 3-Column Grid for Dimensions (Length, Width, Height) */
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+/* 2-Column Grid (e.g. WiFi, Telegram) */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form-hint {
+  display: block;
+  margin-top: 5px;
+  color: #7f8c8d;
+  font-size: 0.85rem;
+}
+
+.form-divider {
+  border: 0;
+  border-top: 1px solid #eee;
+  margin: 25px 0;
+}
+
+.section-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #2c3e50;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.modal-footer {
+  margin-top: 30px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  align-items: center;
+}
+
+.btn-cancel {
+  cursor: pointer;
+  color: #7f8c8d;
+  font-weight: 500;
+  font-size: 1rem;
+  background: none;
+  border: none;
+  padding: 10px 15px;
+  transition: color 0.2s;
+}
+
+.btn-cancel:hover {
+  color: #34495e;
+}
+
+.btn-save {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  font-size: 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-save:hover {
+  background: #c0392b;
+}
+
+/* Mobile specific for grids */
+@media (max-width: 480px) {
+  .form-grid-3 {
+    grid-template-columns: 1fr;
+    /* Stack on very small screens */
+    gap: 10px;
+  }
+
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+    /* Stack buttons, save on top */
+    gap: 10px;
+    width: 100%;
+  }
+
+  .btn-save,
+  .btn-cancel {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* --- WAITING ROOM HORIZONTAL SCROLL (Mobile) --- */
+@media (max-width: 768px) {
+  #waiting-room-list {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 15px;
+    padding-bottom: 30px;
+    /* Space for scrollbar/shadow */
+    margin-bottom: 20px;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    /* Snap effect implies cards */
+    scroll-snap-type: x mandatory;
+  }
+
+  #waiting-room-list .card-pending {
+    min-width: 280px;
+    /* Fixed width for cards in scroll */
+    flex-shrink: 0;
+    margin-bottom: 0;
+    /* Override default grid margin */
+    scroll-snap-align: start;
+  }
+
+  /* Hide scrollbar for cleaner look if desired, but good to have constraint */
+  #waiting-room-list::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  #waiting-room-list::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+  }
+}
+
+/* Fix Delete Button in Config Table on Mobile */
+@media (max-width: 768px) {
+  .btn-delete-icon {
+    padding: 8px 12px;
+    /* Larger touch target */
+    font-size: 1rem;
+    margin-top: 5px;
+    /* Spacing if wrapped */
+  }
+
+  /* Ensure action column doesn't squish buttons */
+  td:last-child {
+    white-space: nowrap;
+    display: flex;
+    gap: 5px;
+  }
 }

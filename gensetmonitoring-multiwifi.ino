@@ -1,134 +1,110 @@
 #include "time.h"
 #include <ArduinoJson.h>
 #include <FirebaseESP32.h>
+#include <Preferences.h> // Library untuk penyimpanan persisten (Flash)
 #include <UniversalTelegramBot.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <WiFiMulti.h> // LIBRARY BARU UNTUK MULTI WIFI
+#include <WiFiMulti.h>
 
 // ==========================================
-// 1. KONFIGURASI PENGGUNA (FIREBASE & BOT)
+// 1. KONFIGURASI DAN MAKRRO
 // ==========================================
-// CATATAN: Konfigurasi WiFi sekarang ada di dalam void setup()
 
+// WiFi Default (Fallback/Factory)
+// Digunakan hanya jika WiFi konfigurasi (Saved) gagal.
+#define FACTORY_WIFI_SSID "wifi-iot"
+#define FACTORY_WIFI_PASS "password-iot"
+
+// Firebase Credentials
+// Host & Auth Token untuk proyek Firebase Anda
 #define FIREBASE_HOST                                                          \
   "monitoring-9bffa-default-rtdb.asia-southeast1.firebasedatabase.app"
 #define FIREBASE_AUTH "xmLz3TvFaWb3YZ8RWXjdlzfowdxQEv7GtAwDi0Z2"
 
-#define BOT_TOKEN "8543325034:AAHijmifk4JSunOQU69ZW7vyCmXBYI5VOm4" // Token Bot
-#define CHAT_ID "6184157784"                                       // ID Chat
-
-// ==========================================
-// 1.1 KONFIGURASI DEVICE (PENTING: GANTI UTK SETIAP ALAT)
-// ==========================================
-#define DEVICE_ID "GENSET_01" // Ganti dengan GENSET_002, GENSET_003, dst.
-
-// ==========================================
-// 2. KONFIGURASI SENSOR & TANGKI
-// ==========================================
+// Hardware Pin Definitions
 #define TRIGGER_PIN 4
 #define ECHO_PIN 33
 #define SOUND_SPEED 0.0343
-#define MAX_DISTANCE 90 // Tinggi Tangki (cm)
-
-// Dimensi Tangki (Panjang x Lebar)
-const float TANGKI_PANJANG = 85.0;
-const float TANGKI_LEBAR = 60.0;
-const float MAX_VOLUME_LITER = 459.0;
 
 // ==========================================
-// 3. INISIALISASI OBJEK
+// 2. VARIABEL GLOBAL
 // ==========================================
+
+// --- Identitas & Koneksi ---
+String deviceID = "";    // Otomatis (Format: GENSET_XXXXXX)
+Preferences preferences; // Object untuk akses Flash Memory
+WiFiMulti wifiMulti;
+WiFiClientSecure client;
+UniversalTelegramBot *bot;
+
+// --- Data Firebase Helper ---
 FirebaseData firebaseData;
 FirebaseConfig config;
 FirebaseAuth auth;
 
-WiFiClientSecure client;
-UniversalTelegramBot bot(BOT_TOKEN, client);
-WiFiMulti wifiMulti; // Objek untuk Multi WiFi
+// --- Variabel Konfigurasi (Disimpan di Preferences) ---
+// Default values jika belum ada config tersimpan
+String cfg_alias = "Genset Unconfigured";
+float cfg_tankLength = 85.0; // cm
+float cfg_tankWidth = 60.0;  // cm
+float cfg_tankHeight = 90.0; // cm
+float cfg_engineLPH = 50.0;  // Liter/Hour
+String cfg_wifiSSID = "";    // Configured WiFi
+String cfg_wifiPass = "";
+String cfg_tgToken = "";  // Telegram Token
+String cfg_tgChatId = ""; // Telegram Chat ID
 
-// ==========================================
-// 4. VARIABEL LOGIKA
-// ==========================================
-// Variabel Data Dasar
+// --- Runtime Calculations ---
+float maxVolumeLiter = 0;
+float thresholdStart = 0;
+float thresholdStop = 0;
+
+// --- Variabel Operasional ---
 float lastVolume = 0;
+float volumeSatuMenitLalu = 0;
 float startVolume = 0;
 float lastSentVolume = -1;
-unsigned int tinggi = 0;
-
-// Status Mesin & Waktu
-bool isMachineRunning = false;
 unsigned long startTime = 0;
 String startTimeStr = "";
-unsigned long lastChangeTime = 0;
-
-// Status Notifikasi
+bool isConfigLoaded = false;
+bool isMachineRunning = false;
 bool isLowFuelNotified = false;
 
-// --- VARIABEL UNTUK LOGIKA 500kVA ---
-unsigned long lastCheckTime = 0;
-const long CHECK_INTERVAL = 60000; // Cek setiap 1 Menit (60.000 ms)
-
-float volumeSatuMenitLalu = 0;
+// Counters
 int counterPenurunan = 0;
 int counterDiam = 0;
+unsigned long lastCheckTime = 0;
+const long CHECK_INTERVAL = 60000; // 1 Menit
+
+// Time Sync
+const char *ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 7 * 3600; // WIB
+const int daylightOffset_sec = 0;
 
 // ==========================================
-// 5. SETUP (KONFIGURASI WIFI DISINI)
+// 3. FUNGSI UTILITAS & IDENTITAS
 // ==========================================
-void setup() {
-  Serial.begin(115200);
 
-  // Setup Pin Sensor
-  pinMode(TRIGGER_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
+// Generate Device ID dari MAC Address
+void generateDeviceID() {
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  char idBuffer[20];
+  // Format: GENSET_A1B2C3
+  snprintf(idBuffer, sizeof(idBuffer), "GENSET_%02X%02X%02X", mac[3], mac[4],
+           mac[5]);
+  deviceID = String(idBuffer);
 
-  // ------------------------------------------
-  // DAFTARKAN LIST WIFI DISINI (BISA LEBIH DARI 2)
-  // ------------------------------------------
-  wifiMulti.addAP("zz", "z(a)nyasepuluh");     // WiFi Utama
-  wifiMulti.addAP("wifi-iot", "password-iot"); // WiFi Cadangan 1
-  wifiMulti.addAP("Ruang Bersama TIF",
-                  "Jambicentrum"); // WiFi Cadangan 2 (Opsional)
-
-  Serial.println("Connecting to WiFi...");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
-  // Loop sampai terhubung ke salah satu WiFi
-  while (wifiMulti.run() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("\nWiFi Connected!");
-  Serial.print("Connected to: ");
-  Serial.println(WiFi.SSID()); // Print nama WiFi yang nyangkut
-
-  // Setup SSL Telegram
-  client.setInsecure();
-
-  // Konfigurasi Waktu (WIB GMT+7)
-  configTime(7 * 3600, 0, "pool.ntp.org");
-
-  // Konfigurasi Firebase
-  config.host = FIREBASE_HOST;
-  config.signer.tokens.legacy_token = FIREBASE_AUTH;
-
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectWiFi(true);
-  firebaseData.setBSSLBufferSize(1024, 1024);
-
-  // Notif Awal
-  Serial.println("Sistem Siap! Menunggu data sensor...");
-  bot.sendMessage(CHAT_ID,
-                  "🤖 Sistem Monitoring Genset (Multi-WiFi Support) AKTIF", "");
+  Serial.println("\n==================================");
+  Serial.println("IDENTITY GENERATED");
+  Serial.print("Device MAC: ");
+  Serial.println(WiFi.macAddress());
+  Serial.print("Device ID : ");
+  Serial.println(deviceID);
+  Serial.println("==================================\n");
 }
 
-// ==========================================
-// 6. FUNGSI PENDUKUNG
-// ==========================================
-
-// Fungsi Waktu
 String getTimestamp() {
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo))
@@ -138,236 +114,383 @@ String getTimestamp() {
   return String(buffer);
 }
 
-// Fungsi Sensor Manual (Raw Data)
-float getDistanceManual() {
-  digitalWrite(TRIGGER_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIGGER_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIGGER_PIN, LOW);
-  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
-  if (duration == 0)
-    return -1.0;
-  return (duration * SOUND_SPEED) / 2;
+// Logic Threshold berdasarkan Konsumsi BBM
+void recalculateLogic() {
+  // 1. Max Volume (Liter)
+  maxVolumeLiter = (cfg_tankLength * cfg_tankWidth * cfg_tankHeight) / 1000.0;
+
+  // 2. Threshold Start/Stop
+  // Konsumsi per menit
+  float consumptionPerMinute = cfg_engineLPH / 60.0;
+
+  // Start: Penurunan > 80% dari konsumsi normal
+  thresholdStart = consumptionPerMinute * 0.8;
+
+  // Stop: Penurunan < 30% dari konsumsi normal (diasumsikan noise/stabil)
+  thresholdStop = consumptionPerMinute * 0.3;
+
+  Serial.println("--- LOGIC UPDATED ---");
+  Serial.printf("Vol Max: %.1f L\n", maxVolumeLiter);
+  Serial.printf("Start Threshold: > %.3f L/min\n", thresholdStart);
+  Serial.printf("Stop Threshold : < %.3f L/min\n", thresholdStop);
 }
 
-// FUNGSI SMOOTHING (Rata-rata)
-float getSmoothedDistance() {
-  float total = 0;
-  int validCount = 0;
+// ==========================================
+// 4. MANAJEMEN PREFERENCES (FLASH STORAGE)
+// ==========================================
 
-  for (int i = 0; i < 15; i++) {
-    float val = getDistanceManual();
-    if (val > 0 && val < MAX_DISTANCE + 10) {
-      total += val;
-      validCount++;
-    }
-    delay(30);
+void loadPreferences() {
+  Serial.println("Loading Preferences...");
+  preferences.begin("genset-cfg",
+                    true); // Read-only mode = false, tapi kita butuh RW nanti
+  // Tapi disini true mode hanya Read Only? No, begin(name, readOnly).
+  // Kita pakai false agar bisa write jika perlu inisialisasi awal (jarang).
+  // Sebaiknya load mode true (RO) cukup, saat save baru false (RW).
+
+  // Kita tutup dulu dan buka mode RO
+  preferences.end();
+  preferences.begin("genset-cfg", true);
+
+  cfg_alias = preferences.getString("alias", "Genset Unconfigured");
+  cfg_tankLength = preferences.getFloat("len", 85.0);
+  cfg_tankWidth = preferences.getFloat("wid", 60.0);
+  cfg_tankHeight = preferences.getFloat("hgt", 90.0);
+  cfg_engineLPH = preferences.getFloat("lph", 50.0);
+
+  cfg_wifiSSID = preferences.getString("ssid", "");
+  cfg_wifiPass = preferences.getString("pass", "");
+
+  cfg_tgToken = preferences.getString("tg_tok", "");
+  cfg_tgChatId = preferences.getString("tg_id", "");
+
+  preferences.end();
+
+  recalculateLogic();
+
+  // Init Bot jika token ada
+  if (cfg_tgToken.length() > 5) {
+    bot = new UniversalTelegramBot(cfg_tgToken, client);
+  }
+}
+
+void savePreferences() {
+  Serial.println("Saving Config to Flash...");
+  preferences.begin("genset-cfg", false); // Read-Write Mode
+
+  preferences.putString("alias", cfg_alias);
+  preferences.putFloat("len", cfg_tankLength);
+  preferences.putFloat("wid", cfg_tankWidth);
+  preferences.putFloat("hgt", cfg_tankHeight);
+  preferences.putFloat("lph", cfg_engineLPH);
+
+  preferences.putString("ssid", cfg_wifiSSID);
+  preferences.putString("pass", cfg_wifiPass);
+
+  preferences.putString("tg_tok", cfg_tgToken);
+  preferences.putString("tg_id", cfg_tgChatId);
+
+  preferences.end();
+  Serial.println("Config Saved!");
+}
+
+// ==========================================
+// 5. KONEKSI & SYNC
+// ==========================================
+
+void connectToWiFi() {
+  WiFi.mode(WIFI_STA);
+  wifiMulti.cleanAPlist(); // Bersihkan list lama
+
+  // 1. Prioritas: Configured WiFi (Dari Preferences)
+  if (cfg_wifiSSID.length() > 0) {
+    Serial.printf("Priority 1: Connecting to Saved WiFi [%s]...\n",
+                  cfg_wifiSSID.c_str());
+    wifiMulti.addAP(cfg_wifiSSID.c_str(), cfg_wifiPass.c_str());
   }
 
-  if (validCount == 0)
-    return -1;
-  return total / validCount;
+  // 2. Fallback: Factory WiFi
+  Serial.printf("Priority 2: Fallback WiFi [%s]\n", FACTORY_WIFI_SSID);
+  wifiMulti.addAP(FACTORY_WIFI_SSID, FACTORY_WIFI_PASS);
+
+  int retry = 0;
+  while (wifiMulti.run() != WL_CONNECTED && retry < 15) {
+    delay(1000);
+    Serial.print(".");
+    retry++;
+  }
+
+  if (wifiMulti.run() == WL_CONNECTED) {
+    Serial.println("\nWiFi Connected!");
+    Serial.print("SSID: ");
+    Serial.println(WiFi.SSID());
+    Serial.print("IP  : ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nWiFi Connection Failed. Running Offline Logic.");
+  }
+}
+
+void checkFirebaseConfig() {
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+
+  // Cek path config di firebase
+  String path = "/devices/" + deviceID + "/config";
+
+  if (Firebase.getJSON(firebaseData, path)) {
+    FirebaseJson &json = firebaseData.jsonObject();
+    FirebaseJsonData res;
+
+    bool needSave = false;
+
+// Helper macro to update if changed
+#define UPDATE_STR(key, var)                                                   \
+  json.get(res, key);                                                          \
+  if (res.success && res.stringValue != var) {                                 \
+    var = res.stringValue;                                                     \
+    needSave = true;                                                           \
+    Serial.println("Updated " key);                                            \
+  }
+
+#define UPDATE_FLOAT(key, var)                                                 \
+  json.get(res, key);                                                          \
+  if (res.success && abs(res.floatValue - var) > 0.01) {                       \
+    var = res.floatValue;                                                      \
+    needSave = true;                                                           \
+    Serial.println("Updated " key);                                            \
+  }
+
+    UPDATE_STR("alias", cfg_alias);
+    UPDATE_FLOAT("tank/length", cfg_tankLength);
+    UPDATE_FLOAT("tank/width", cfg_tankWidth);
+    UPDATE_FLOAT("tank/height", cfg_tankHeight);
+    UPDATE_FLOAT("engine/consumption_lph", cfg_engineLPH);
+
+    // WiFi update (Hati-hati, jika salah ganti, alat bisa putus)
+    UPDATE_STR("wifi/ssid", cfg_wifiSSID);
+    json.get(res, "wifi/pass");
+    if (res.success && res.stringValue != cfg_wifiPass) {
+      cfg_wifiPass = res.stringValue;
+      needSave = true;
+    }
+
+    // Telegram
+    UPDATE_STR("telegram/bot_token", cfg_tgToken);
+    UPDATE_STR("telegram/chat_id", cfg_tgChatId);
+
+    if (needSave) {
+      savePreferences();
+      recalculateLogic();
+
+      // Re-init bot
+      if (cfg_tgToken.length() > 5) {
+        delete bot;
+        bot = new UniversalTelegramBot(cfg_tgToken, client);
+      }
+    }
+  }
 }
 
 // ==========================================
-// 7. LOOP UTAMA (LOGIKA 500kVA + PESAN LAMA)
+// 6. SETUP UTAMA
 // ==========================================
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(TRIGGER_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  // 1. Generate Identity
+  generateDeviceID();
+
+  // 2. Load Config from Flash
+  loadPreferences();
+
+  // 3. Connect WiFi
+  connectToWiFi();
+
+  // 4. Time Sync & Firebase
+  client.setInsecure();
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+  config.host = FIREBASE_HOST;
+  config.signer.tokens.legacy_token = FIREBASE_AUTH;
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+
+  // 5. Initial Config Check (Sync Cloud to Flash)
+  checkFirebaseConfig();
+
+  // 6. Boot Notification
+  if (bot && cfg_tgChatId.length() > 5) {
+    String msg = "🚀 <b>GENSET ONLINE</b>\n";
+    msg += "ID: " + deviceID + "\n";
+    msg += "Alias: " + cfg_alias + "\n";
+    msg += "IP: " + WiFi.localIP().toString();
+    bot->sendMessage(cfg_tgChatId, msg, "HTML");
+  }
+}
+
+// ==========================================
+// 7. SENSOR & LOGIC LOOP
+// ==========================================
+
+float getDistance() {
+  float total = 0;
+  int valid = 0;
+  for (int i = 0; i < 10; i++) {
+    digitalWrite(TRIGGER_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIGGER_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIGGER_PIN, LOW);
+    long duration = pulseIn(ECHO_PIN, HIGH, 25000); // Timeout 25ms
+    if (duration > 0) {
+      float dist = (duration * SOUND_SPEED) / 2;
+      if (dist > 0 && dist < 400) {
+        total += dist;
+        valid++;
+      }
+    }
+    delay(20);
+  }
+  return (valid > 0) ? (total / valid) : -1;
+}
 
 void loop() {
-  // Pastikan WiFi tetap terhubung (Auto Reconnect Multi WiFi)
+  // WiFi Monitor
   if (wifiMulti.run() != WL_CONNECTED) {
-    Serial.println("WiFi Lost... Reconnecting...");
+    // Retry logic handled by library, but we can log
   }
 
-  // 1. Ambil Data Stabil (Smoothing)
-  float jarakFloat = getSmoothedDistance();
-
-  // Handling Blind Spot & Error
-  if (jarakFloat == -1) {
+  // A. Baca Sensor
+  float dist = getDistance();
+  if (dist == -1) {
     delay(1000);
     return;
-  }
+  } // Error reading
 
-  if (jarakFloat < 20.0)
-    jarakFloat = 0.0;
-  unsigned int jarak = (unsigned int)jarakFloat;
-  if (jarak > MAX_DISTANCE)
-    jarak = MAX_DISTANCE;
+  // Clamp & Calculate
+  if (dist > cfg_tankHeight)
+    dist = cfg_tankHeight;
+  float level = cfg_tankHeight - dist;
+  if (level < 0)
+    level = 0;
 
-  // 2. Hitung Volume Saat Ini
-  float currentVolume =
-      (90.0 - (float)jarak) * TANGKI_PANJANG * TANGKI_LEBAR * 0.001;
-  if (currentVolume < 0)
-    currentVolume = 0;
+  float vol = (cfg_tankLength * cfg_tankWidth * level) / 1000.0;
+  unsigned int tinggiUI = (unsigned int)level;
 
-  tinggi = 90 - jarak;
-
-  // Init awal volumeSatuMenitLalu
+  // Init History
   if (volumeSatuMenitLalu == 0)
-    volumeSatuMenitLalu = currentVolume;
+    volumeSatuMenitLalu = vol;
 
-  // --- UPDATE FIREBASE REALTIME (UI) ---
-  if (abs(currentVolume - lastSentVolume) >= 0.5) {
-    String basePath = "/devices/" + String(DEVICE_ID) + "/data";
-    Firebase.setFloat(firebaseData, basePath + "/volume", currentVolume);
-    Firebase.setInt(firebaseData, basePath + "/tinggi", tinggi);
-    lastSentVolume = currentVolume;
+  // B. Kirim Realtime Data (Jika berubah signifikan)
+  if (abs(vol - lastSentVolume) >= 0.2) {
+    String basePath = "/devices/" + deviceID + "/data";
+    Firebase.setFloat(firebaseData, basePath + "/volume", vol);
+    Firebase.setInt(firebaseData, basePath + "/tinggi", tinggiUI);
+    lastSentVolume = vol;
   }
 
-  // ============================================================
-  // LOGIKA DETEKSI GENSET (Sistem Sampling 1 Menit)
-  // ============================================================
-
+  // C. Logika Per Menit
   if (millis() - lastCheckTime > CHECK_INTERVAL) {
-    lastCheckTime = millis(); // Reset timer 1 menit
+    lastCheckTime = millis();
 
-    // Delta positif = Berkurang, Delta negatif = Bertambah
-    float delta = volumeSatuMenitLalu - currentVolume;
+    // Cek Periodik Config Baru
+    checkFirebaseConfig();
 
-    Serial.print("Cek 1 Menit -> Delta: ");
-    Serial.print(delta);
-    Serial.println(" Liter");
+    float delta = volumeSatuMenitLalu - vol;
 
-    // --- A. LOGIKA PENGISIAN (REFUEL) ---
-    if (delta < -5.0 && !isMachineRunning) {
-      // Format Pesan LAMA
-      String pesan = "⛽ PENGISIAN DETECTED!\n";
-      pesan += "Waktu: " + getTimestamp() + "\n";
-      pesan += "Awal: " + String(volumeSatuMenitLalu, 1) + " L\n";
-      pesan += "Akhir: " + String(currentVolume, 1) + " L\n";
-      pesan += "Total Isi: +" + String(abs(delta), 1) + " L";
-      bot.sendMessage(CHAT_ID, pesan, "");
+    // 1. Deteksi Pengisian (Delta Negatif Besar)
+    if (delta < -3.0 && !isMachineRunning) {
+      // Logika Pengisian (Sama seperti sebelumnya)
+      String msg = "⛽ <b>Pengisian Terdeteksi</b>\n";
+      msg += "Total: " + String(abs(delta), 1) + " L";
+      if (bot)
+        bot->sendMessage(cfg_tgChatId, msg, "HTML");
 
-      // Update Firebase Logs LAMA
-      FirebaseJson jsonLog;
-      jsonLog.set("tanggal", getTimestamp());
-      jsonLog.set("volume_awal", String(volumeSatuMenitLalu));
-      jsonLog.set("volume_akhir", String(currentVolume));
-      jsonLog.set("status", "Pengisian");
+      // Kirim Log ke Firebase
+      FirebaseJson log;
+      log.set("tanggal", getTimestamp());
+      log.set("volume_awal", volumeSatuMenitLalu);
+      log.set("volume_akhir", vol);
+      log.set("status", "Pengisian");
+      Firebase.pushJSON(firebaseData, "/devices/" + deviceID + "/data/logs",
+                        log);
 
-      String basePath = "/devices/" + String(DEVICE_ID) + "/data";
-      Firebase.pushJSON(firebaseData, basePath + "/logs", jsonLog);
-      // Hapus last_run jika tidak diperlukan atau ubah pathnya
-      // Firebase.setJSON(firebaseData, "/genset/last_run", jsonLog);
-
-      volumeSatuMenitLalu = currentVolume;
-      lastVolume = currentVolume;
+      volumeSatuMenitLalu = vol;
       return;
     }
 
-    // --- B. LOGIKA DETEKSI START (NYALA) ---
-    // Syarat Baru: Turun > 0.8L selama 2 menit berturut-turut
+    // 2. Deteksi Running
     if (!isMachineRunning) {
-      if (delta > 0.8) {
+      if (delta > thresholdStart)
         counterPenurunan++;
-      } else {
+      else
         counterPenurunan = 0;
-      }
 
       if (counterPenurunan >= 2) {
         isMachineRunning = true;
         startVolume = volumeSatuMenitLalu + delta;
         startTime = millis();
         startTimeStr = getTimestamp();
-        lastChangeTime = millis();
 
-        // Format Pesan LAMA
-        String pesan = "⚠️ GENSET MENYALA!\n";
-        pesan += "Waktu: " + startTimeStr + "\n";
-        pesan += "Volume Awal: " + String(startVolume, 1) + " L";
-        bot.sendMessage(CHAT_ID, pesan, "");
-
-        Serial.println("STATUS: Mesin Terdeteksi MENYALA...");
+        if (bot) {
+          String msg = "⚠️ <b>MESIN NYALA</b>\nAlias: " + cfg_alias;
+          bot->sendMessage(cfg_tgChatId, msg, "HTML");
+        }
         counterPenurunan = 0;
       }
     }
-
-    // --- C. LOGIKA DETEKSI STOP (MATI) ---
-    // Syarat Baru: Delta < 0.5L selama 3 menit berturut-turut
-    else if (isMachineRunning) {
-      if (delta < 0.5) {
+    // 3. Deteksi Stop
+    else {
+      if (delta < thresholdStop)
         counterDiam++;
-      } else {
+      else
         counterDiam = 0;
-      }
 
       if (counterDiam >= 3) {
         isMachineRunning = false;
+        long durasi = (millis() - startTime) / 60000;
+        float konsumsi = startVolume - vol;
+        if (konsumsi < 0)
+          konsumsi = 0;
 
-        // Kalkulasi Total (Dikurangi 3 menit waktu tunggu deteksi)
-        unsigned long durasiMillis = millis() - startTime - (3 * 60000);
-        int durasiMenit = durasiMillis / 60000;
-        if (durasiMenit < 0)
-          durasiMenit = 0;
+        // Kirim History
+        FirebaseJson his;
+        his.set("tanggal", startTimeStr);
+        his.set("jam_nyala", startTimeStr.substring(11, 16));
+        his.set("durasi", String(durasi) + " Menit");
+        his.set("konsumsi_bbm", String(konsumsi, 1) + " L");
+        his.set("status", "Normal");
+        Firebase.pushJSON(firebaseData,
+                          "/devices/" + deviceID + "/data/history", his);
 
-        float totalKonsumsi = startVolume - currentVolume;
-        if (totalKonsumsi < 0)
-          totalKonsumsi = 0;
-
-        // Logika Status LAMA
-        String status = (totalKonsumsi > 0 && totalKonsumsi < 200)
-                            ? "Normal"
-                            : "Check Sensor";
-        String stopTimeStr = getTimestamp();
-
-        // 1. UPDATE RIWAYAT
-        FirebaseJson jsonHistory;
-        jsonHistory.set("tanggal", startTimeStr);
-
-        // Ambil Jam Nyala
-        String jamNyala = "00:00";
-        if (startTimeStr.length() > 5) {
-          jamNyala = startTimeStr.substring(startTimeStr.length() - 5);
+        // Notif
+        if (bot) {
+          String msg = "✅ <b>MESIN MATI</b>\n";
+          msg += "Durasi: " + String(durasi) + " Min\n";
+          msg += "Konsumsi: " + String(konsumsi, 1) + " L";
+          bot->sendMessage(cfg_tgChatId, msg, "HTML");
         }
-        jsonHistory.set("jam_nyala", jamNyala);
-        jsonHistory.set("durasi", String(durasiMenit) + " Menit");
-        jsonHistory.set("konsumsi_bbm", String(totalKonsumsi, 1) + " L");
-        jsonHistory.set("status", status);
-
-        String basePath = "/devices/" + String(DEVICE_ID) + "/data";
-        Firebase.pushJSON(firebaseData, basePath + "/history", jsonHistory);
-
-        // 2. UPDATE LOG TERKINI
-        FirebaseJson jsonLog;
-        jsonLog.set("tanggal", stopTimeStr);
-        jsonLog.set("volume_awal", String(startVolume));
-        jsonLog.set("volume_akhir", String(currentVolume));
-        jsonLog.set("status", "Pemakaian");
-
-        Firebase.pushJSON(firebaseData, basePath + "/logs", jsonLog);
-        // Firebase.setJSON(firebaseData, "/genset/last_run", jsonLog);
-
-        // 3. KIRIM TELEGRAM LENGKAP
-        String pesan = "✅ GENSET MATI\n";
-        pesan += "Waktu: " + stopTimeStr + "\n";
-        pesan += "Durasi: " + String(durasiMenit) + " Menit\n";
-        pesan += "Konsumsi: " + String(totalKonsumsi, 1) + " L\n";
-        pesan += "Sisa BBM: " + String(currentVolume, 1) + " L\n";
-        pesan += "Status: " + status;
-
-        bot.sendMessage(CHAT_ID, pesan, "");
-        Serial.println("STATUS: Mesin MATI. Laporan terkirim.");
-
         counterDiam = 0;
       }
     }
 
-    // Update titik acuan
-    volumeSatuMenitLalu = currentVolume;
+    volumeSatuMenitLalu = vol;
 
-    // Notifikasi Bensin Habis
-    float persentase = (currentVolume / MAX_VOLUME_LITER) * 100.0;
-    if (persentase <= 20.0 && !isLowFuelNotified) {
-      String pesan = "⚠️ PERINGATAN: BENSIN KRITIS!\n";
-      pesan += "Waktu: " + getTimestamp() + "\n";
-      pesan += "Sisa BBM: " + String(currentVolume, 1) + " L (" +
-               String(persentase, 0) + "%)\n";
-      pesan += "Segera lakukan pengisian ulang!";
-      bot.sendMessage(CHAT_ID, pesan, "");
-      isLowFuelNotified = true;
-    } else if (persentase > 25.0) {
-      isLowFuelNotified = false;
+    // Low Fuel Alert (Setiap menit jika dibawah 20%)
+    if (maxVolumeLiter > 0) {
+      float pct = (vol / maxVolumeLiter) * 100.0;
+      if (pct < 20.0 && !isLowFuelNotified) {
+        if (bot)
+          bot->sendMessage(cfg_tgChatId,
+                           "🚨 <b>LOW FUEL:</b> " + String(pct, 0) + "%",
+                           "HTML");
+        isLowFuelNotified = true;
+      } else if (pct > 25.0) {
+        isLowFuelNotified = false;
+      }
     }
   }
 

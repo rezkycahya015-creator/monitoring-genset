@@ -14,7 +14,7 @@
   <!-- SheetJS for Excel Export -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=2.0" />
 </head>
 
 <body>
@@ -58,6 +58,10 @@
       <button onclick="showPage('user')" id="btn-user" class="nav-item">
         <i class="fa-solid fa-users"></i>
         <span>Manajemen User</span>
+      </button>
+      <button onclick="showPage('config')" id="btn-config" class="nav-item">
+        <i class="fa-solid fa-gears"></i>
+        <span>Konfigurasi Alat</span>
       </button>
     </nav>
 
@@ -259,12 +263,173 @@
           </div>
         </div>
       </div>
+
+      <!-- HALAMAN KONFIGURASI ALAT (BARU) -->
+      <div id="config" class="page">
+        <div class="dashboard-header">
+          <h2>Konfigurasi Alat</h2>
+          <span>Waiting Room & Provisioning</span>
+        </div>
+
+        <!-- Waiting Room Section -->
+        <h3 style="margin-bottom: 15px; color: #2c3e50; font-size: 1.25rem; font-weight: 700;">
+          <i class="fa-solid fa-satellite-dish" style="color: #f1c40f; margin-right: 10px;"></i>
+          New Devices Detected
+        </h3>
+        <div id="waiting-room-list" class="cards-grid" style="margin-bottom: 40px; min-height: 100px;">
+          <!-- Card Alat Pending akan muncul disini -->
+          <p style="color: #999; width: 100%;">Scanning for new devices...</p>
+        </div>
+
+        <!-- Devices List Table -->
+        <div class="table-card">
+          <div class="table-header">
+            <h3 style="font-size: 1.1rem"><i class="fa-solid fa-server"></i> Perangkat Terdaftar</h3>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Device ID</th>
+                  <th>Alias / Nama</th>
+                  <th>Dimensi Tangki</th>
+                  <th>Konsumsi BBM</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="config-table-body">
+                <!-- List alat aktif -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL KONFIGURASI (POPUP) -->
+      <div id="config-modal" class="modal">
+        <div class="modal-content">
+          <div class="modal-header__new">
+            <h2>Configure Device: <span id="modal-device-id" style="color: #e74c3c;">GENSET_0</span></h2>
+          </div>
+
+          <form id="config-form" onsubmit="saveConfig(event)">
+            <div class="form-group">
+              <label class="form-label">Device Alias</label>
+              <input type="text" id="cfg-alias" class="input-full" placeholder="e.g. Genset Gudang A" required>
+            </div>
+
+            <div class="form-grid-3">
+              <div>
+                <label class="form-label">Length (cm)</label>
+                <input type="number" id="cfg-length" class="input-full" required>
+              </div>
+              <div>
+                <label class="form-label">Width (cm)</label>
+                <input type="number" id="cfg-width" class="input-full" required>
+              </div>
+              <div>
+                <label class="form-label">Height (cm)</label>
+                <input type="number" id="cfg-height" class="input-full" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Engine Consumption (Liter/Hour)</label>
+              <input type="number" id="cfg-lph" class="input-full" placeholder="50" required>
+              <small class="form-hint">Used for Start/Stop detection logic.</small>
+            </div>
+
+            <hr class="form-divider">
+
+            <div class="form-group">
+              <label class="section-title">WiFi Configuration (Optional)</label>
+              <div class="form-grid-2">
+                <input type="text" id="cfg-ssid" class="input-full" placeholder="SSID">
+                <input type="text" id="cfg-pass" class="input-full" placeholder="Password">
+              </div>
+            </div>
+
+            <!-- NETWORK STATUS READONLY -->
+            <div class="form-group" style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
+              <label class="section-title" style="margin-bottom: 8px;">Current Device Network Status</label>
+              <div class="form-grid-3">
+                <div>
+                  <label class="form-label" style="font-size: 0.8rem;">Connected SSID</label>
+                  <input type="text" id="stat-ssid" class="input-full" readonly
+                    style="background: #e9ecef; color: #555;">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size: 0.8rem;">IP Address</label>
+                  <input type="text" id="stat-ip" class="input-full" readonly style="background: #e9ecef; color: #555;">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size: 0.8rem;">Signal (RSSI)</label>
+                  <input type="text" id="stat-rssi" class="input-full" readonly
+                    style="background: #e9ecef; color: #555;">
+                </div>
+              </div>
+              <small id="stat-last-online"
+                style="display: block; margin-top: 5px; color: #888; font-size: 0.75rem; text-align: right;"></small>
+            </div>
+
+            <div class="form-group">
+              <label class="section-title">Ethernet Configuration</label>
+              <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <input type="checkbox" id="cfg-eth-enable" style="margin-right: 8px;">
+                <label for="cfg-eth-enable" style="margin-right: 20px;">Enable (LAN8720)</label>
+
+                <input type="checkbox" id="cfg-eth-static" style="margin-right: 8px;" onchange="toggleStaticIP()">
+                <label for="cfg-eth-static">Use Static IP</label>
+              </div>
+
+              <div id="eth-static-fields"
+                style="display: none; padding: 10px; background: #f9f9f9; border-radius: 5px;">
+                <div class="form-grid-2">
+                  <div>
+                    <label class="form-label">IP Address</label>
+                    <input type="text" id="cfg-eth-ip" class="input-full" placeholder="192.168.1.200">
+                  </div>
+                  <div>
+                    <label class="form-label">Gateway</label>
+                    <input type="text" id="cfg-eth-gateway" class="input-full" placeholder="192.168.1.1">
+                  </div>
+                </div>
+                <div class="form-grid-3">
+                  <div>
+                    <label class="form-label">Subnet Mask</label>
+                    <input type="text" id="cfg-eth-subnet" class="input-full" placeholder="255.255.255.0">
+                  </div>
+                  <div>
+                    <label class="form-label">DNS 1</label>
+                    <input type="text" id="cfg-eth-dns1" class="input-full" placeholder="8.8.8.8">
+                  </div>
+                  <div>
+                    <label class="form-label">DNS 2</label>
+                    <input type="text" id="cfg-eth-dns2" class="input-full" placeholder="1.1.1.1">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="section-title">Telegram Notification (Optional)</label>
+              <input type="text" id="cfg-token" class="input-full" placeholder="Bot Token" style="margin-bottom: 10px;">
+              <input type="text" id="cfg-chatid" class="input-full" placeholder="Chat ID">
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn-cancel" onclick="closeConfigModal()">Cancel</button>
+              <button type="submit" class="btn-save">Save & Activate</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </main>
   </div>
 
-  </main>
-  </div>
-
-  <script src="script.js"></script>
+  <script src="script.js?v=2.1"></script>
 </body>
 
 </html>
