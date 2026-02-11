@@ -20,6 +20,14 @@ function showPage(pageId) {
     document.getElementById("btn-user").classList.add("active");
   if (pageId === "config")
     document.getElementById("btn-config").classList.add("active");
+  if (pageId === "dashboard-global") {
+    document.getElementById("btn-dashboard-global").classList.add("active");
+    document.body.classList.add("full-width-mode");
+    if (deviceSelect) deviceSelect.style.display = "none"; // Hide Dropdown
+  } else {
+    document.body.classList.remove("full-width-mode");
+    if (deviceSelect) deviceSelect.style.display = "inline-block"; // Show Dropdown
+  }
 
   // Tutup sidebar jika di mobile setelah pindah halaman
   closeSidebar();
@@ -244,6 +252,13 @@ function attachListeners(deviceId) {
 }
 
 function renderDashboard() {
+  if (!currentDeviceId) return;
+
+  // Update Dashboard Title
+  const dAlias = (currentDeviceConfig && currentDeviceConfig.alias) ? currentDeviceConfig.alias : currentDeviceId;
+  const dbHeading = document.getElementById("dashboard-heading");
+  if (dbHeading) dbHeading.innerText = `Dashboard > ${dAlias}`;
+
   // STRICT LOGIC FROM USER REQUEST:
   // 1. Tinggi Bahan Bakar = Tinggi Tangki - Jarak Sensor (This is `currentH` from firmware)
   // 2. Volume = Calculated from Height vs Tank Dimensions
@@ -764,6 +779,11 @@ db.ref("/devices").on("value", (snapshot) => {
   const activeDevices = devices.filter(d => d.config && d.config.isActive === true);
   if (configTableBody) renderConfigTable(activeDevices);
 
+  // 3. Render Global Dashboard
+  if (document.getElementById("global-cards-grid")) {
+    renderGlobalDashboard(activeDevices);
+  }
+
   // Update Dropdown di Header agar SINKRON dengan Strict Filter
   updateDeviceDropdown(activeDevices);
 });
@@ -824,7 +844,7 @@ function renderWaitingRoom(devices) {
 function renderConfigTable(devices) {
   configTableBody.innerHTML = "";
   if (devices.length === 0) {
-    configTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Belum ada perangkat terdaftar.</td></tr>`;
+    configTableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;">Belum ada perangkat terdaftar.</td></tr>`;
     return;
   }
 
@@ -836,16 +856,19 @@ function renderConfigTable(devices) {
       <tr>
         <td style="font-weight: bold;">${d.id}</td>
         <td>${conf.alias || "-"}</td>
+        <td>${conf.type || "-"}</td>
         <td>${dim}</td>
         <td>${conf.engine ? conf.engine.consumption_lph + " L/Jam" : "-"}</td>
         <td><span class="badge-active">Aktif</span></td>
         <td>
-           <button class="btn-edit" onclick="openConfigModal('${d.id}')">
-             <i class="fa-solid fa-pen"></i> Edit
-           </button>
-           <button class="btn-delete-icon" onclick="deleteDevice('${d.id}')">
-             <i class="fa-solid fa-trash"></i>
-           </button>
+           <div class="action-cell">
+             <button class="btn-edit" onclick="openConfigModal('${d.id}')" title="Edit">
+               <i class="fa-solid fa-pen"></i>
+             </button>
+             <button class="btn-delete-icon" onclick="deleteDevice('${d.id}')" title="Delete">
+               <i class="fa-solid fa-trash"></i>
+             </button>
+           </div>
         </td>
       </tr>
     `;
@@ -881,6 +904,7 @@ function openConfigModal(deviceId) {
     const conf = snapshot.val();
     if (conf) {
       document.getElementById("cfg-alias").value = conf.alias || "";
+      document.getElementById("cfg-type").value = conf.type || "";
       if (conf.tank) {
         document.getElementById("cfg-length").value = conf.tank.length || "";
         document.getElementById("cfg-width").value = conf.tank.width || "";
@@ -954,8 +978,8 @@ function saveConfig(e) {
   if (!editingDeviceId) return;
 
   // Simple Validation
-  if (!document.getElementById("cfg-alias").value || !document.getElementById("cfg-lph").value) {
-    alert("Harap isi Alias dan Konsumsi BBM!");
+  if (!document.getElementById("cfg-alias").value || !document.getElementById("cfg-type").value || !document.getElementById("cfg-lph").value) {
+    alert("Harap isi Alias, Tipe Genset, dan Konsumsi BBM!");
     return;
   }
 
@@ -964,13 +988,14 @@ function saveConfig(e) {
   const configData = {
     isActive: true, // Mark as active
     alias: document.getElementById("cfg-alias").value,
+    type: document.getElementById("cfg-type").value,
     tank: {
       length: parseFloat(document.getElementById("cfg-length").value) || 0,
       width: parseFloat(document.getElementById("cfg-width").value) || 0,
       height: parseFloat(document.getElementById("cfg-height").value) || 0
     },
     engine: {
-      consumption_lph: parseFloat(document.getElementById("cfg-lph").value) || 0
+      consumption_lph: parseInt(document.getElementById("cfg-lph").value) || 0
     },
     wifi: {
       ssid: document.getElementById("cfg-ssid").value,
@@ -1000,3 +1025,119 @@ function saveConfig(e) {
       alert("Error: " + err.message);
     });
 }
+
+// --- GLOBAL DASHBOARD LOGIC ---
+function renderGlobalDashboard(devices) {
+  const grid = document.getElementById("global-cards-grid");
+  if (!grid) return;
+
+  grid.innerHTML = "";
+
+  if (devices.length === 0) {
+    grid.innerHTML = `<p style="text-align:center; width: 100%; color: #666;">Tidak ada genset aktif.</p>`;
+    return;
+  }
+
+  devices.forEach(d => {
+    // Basic Config
+    const conf = d.config || {};
+    const alias = conf.alias || d.id;
+
+    // Tank Config
+    let cfgHeight = 100;
+    let cfgLength = 100;
+    let cfgWidth = 100;
+    if (conf.tank) {
+      cfgHeight = parseFloat(conf.tank.height) || 100;
+      cfgLength = parseFloat(conf.tank.length) || 100;
+      cfgWidth = parseFloat(conf.tank.width) || 100;
+    }
+
+    // Default Values
+    let percentage = 0;
+    let statusText = "Offline";
+    let statusColor = "#999";
+
+    // Get Data from 'd.data' if available (snapshot contains full tree)
+    const data = d.data || {};
+    const currentH = parseFloat(data.tinggi) || 0;
+
+    // Calculate Logic (Same as Dashboard)
+    const maxVolume = (cfgLength * cfgWidth * cfgHeight) / 1000.0;
+    let calcVolume = (cfgLength * cfgWidth * currentH) / 1000.0;
+
+    // Blind Spot
+    const distance = cfgHeight - currentH;
+
+    if (distance < 20 && distance >= 0) {
+      percentage = 100;
+    } else {
+      if (maxVolume > 0) {
+        percentage = Math.round((calcVolume / maxVolume) * 100);
+      } else {
+        percentage = 0;
+      }
+    }
+
+    // Clamp
+    if (percentage > 100) percentage = 100;
+    if (percentage < 0) percentage = 0;
+
+    // Status Logic
+    if (percentage >= 80) {
+      statusColor = "#2ecc71";
+      statusText = "Sangat Aman";
+    } else if (percentage >= 60) {
+      statusColor = "#f1c40f";
+      statusText = "Cukup";
+    } else if (percentage >= 40) {
+      statusColor = "#e67e22";
+      statusText = "Waspada";
+    } else if (percentage >= 20) {
+      statusColor = "#e67e22";
+      statusText = "Menipis";
+    } else {
+      statusColor = "#e74c3c";
+      statusText = "Bahaya";
+    }
+
+    // Create Card HTML
+    const card = document.createElement("div");
+    card.className = "global-card";
+
+    // Add Click Event to Switch Device & View Dashboard
+    card.onclick = function () {
+      openDeviceDashboard(d.id);
+    };
+
+    card.innerHTML = `
+      <div class="global-card-title">${alias}</div>
+      <div class="global-card-body">
+        <div class="global-battery-shape">
+          <div class="global-battery-level" style="height: calc(${percentage}% - 8px); background-color: ${statusColor};"></div>
+        </div>
+        <div class="global-info">
+          <div class="global-percentage" style="color: ${statusColor};">${percentage}%</div>
+          <div class="global-status-label">Status : <span class="global-status-val" style="color: ${statusColor};">${statusText}</span></div>
+        </div>
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
+}
+
+function openDeviceDashboard(deviceId) {
+  // 1. Set Dropdown Value
+  const select = document.getElementById("device-select");
+  if (select) select.value = deviceId;
+
+  // 2. Trigger Logic to Switch Device
+  switchDevice(deviceId);
+
+  // 3. Navigate to Dashboard Page
+  showPage("dashboard");
+}
+
+// Initialize Default Page
+showPage("dashboard-global");

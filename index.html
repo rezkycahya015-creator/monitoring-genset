@@ -22,7 +22,7 @@
     <div class="logo-area">
       <i class="fa-solid fa-bars" id="btn-toggle-nav"
         style="font-size: 1.5rem; cursor: pointer; display: none; margin-right: 15px;"></i>
-      <i class="fa-solid fa-shield-halved"></i>
+      <img src="Assets/logo.png" alt="Logo" style="height: 40px; width: auto; margin-right: 10px;">
       <h1>Genset Fuel Monitoring System</h1>
     </div>
     <div class="user-area">
@@ -47,7 +47,11 @@
   <div class="wrapper">
     <div id="sidebar-overlay"></div>
     <nav id="sidebar">
-      <button onclick="showPage('dashboard')" id="btn-dashboard" class="nav-item active">
+      <button onclick="showPage('dashboard-global')" id="btn-dashboard-global" class="nav-item active">
+        <i class="fa-solid fa-layer-group"></i>
+        <span>Dashboard Global</span>
+      </button>
+      <button onclick="showPage('dashboard')" id="btn-dashboard" class="nav-item">
         <i class="fa-solid fa-gauge-high"></i>
         <span>Dashboard</span>
       </button>
@@ -66,11 +70,13 @@
     </nav>
 
     <main>
-      <div id="dashboard" class="page active">
+      <div id="dashboard" class="page">
         <div class="dashboard-header">
-          <h2>Dashboard</h2>
+          <h2 id="dashboard-heading">Dashboard</h2>
           <span>Monitoring System</span>
         </div>
+
+        <!-- ... content ... -->
 
         <div class="cards-grid">
           <div class="card">
@@ -119,6 +125,18 @@
         <div id="alert-bar">
           <i class="fa-solid fa-triangle-exclamation"></i>
           Level BBM <span id="alert-perc">0</span> % (Perlu Pengisian)
+        </div>
+      </div>
+
+      <div id="dashboard-global" class="page active">
+        <div class="dashboard-header">
+          <h2>Dashboard Global</h2>
+          <span>All Genset Overview</span>
+        </div>
+
+        <div id="global-cards-grid" class="cards-grid">
+          <!-- Cards will be injected here by JS -->
+          <p style="text-align:center; width: 100%; color: #666;">Memuat data global...</p>
         </div>
       </div>
 
@@ -291,7 +309,8 @@
               <thead>
                 <tr>
                   <th>Device ID</th>
-                  <th>Alias / Nama</th>
+                  <th>Nama Device</th>
+                  <th>Tipe Genset</th>
                   <th>Dimensi Tangki</th>
                   <th>Konsumsi BBM</th>
                   <th>Status</th>
@@ -314,9 +333,26 @@
           </div>
 
           <form id="config-form" onsubmit="saveConfig(event)">
-            <div class="form-group">
-              <label class="form-label">Device Alias</label>
-              <input type="text" id="cfg-alias" class="input-full" placeholder="e.g. Genset Gudang A" required>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Nama Device</label>
+                <input type="text" id="cfg-alias" class="input-full" placeholder="e.g. Genset Gudang A" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Tipe Genset</label>
+                <input list="genset-types" id="cfg-type" class="input-full"
+                  placeholder="Pilih atau ketik tipe genset...">
+                <datalist id="genset-types">
+                  <option value="PERKINS 3000">
+                  <option value="PERKINS 2000">
+                  <option value="VOLVO PENTA">
+                  <option value="CATERPILLAR">
+                  <option value="DEUTZ">
+                  <option value="PERKINS">
+                  <option value="PERIKNS">
+                </datalist>
+              </div>
             </div>
 
             <div class="form-grid-3">
@@ -336,7 +372,39 @@
 
             <div class="form-group">
               <label class="form-label">Engine Consumption (Liter/Hour)</label>
-              <input type="number" id="cfg-lph" class="input-full" placeholder="50" required>
+              <input type="text" id="cfg-lph" class="input-full" placeholder="50" list="lph-options" required>
+              <datalist id="lph-options">
+                <option value="5L / Jam">
+                <option value="10L / Jam">
+                <option value="15L / Jam">
+                <option value="20L / Jam">
+                <option value="25L / Jam">
+                <option value="30L / Jam">
+                <option value="35L / Jam">
+                <option value="40L / Jam">
+                <option value="45L / Jam">
+                <option value="50L / Jam">
+                <option value="55L / Jam">
+                <option value="60L / Jam">
+                <option value="65L / Jam">
+                <option value="70L / Jam">
+                <option value="75L / Jam">
+                <option value="80L / Jam">
+                <option value="85L / Jam">
+                <option value="90L / Jam">
+                <option value="95L / Jam">
+                <option value="100L / Jam">
+                <option value="105L / Jam">
+                <option value="110L / Jam">
+                <option value="115L / Jam">
+                <option value="120L / Jam">
+                <option value="125L / Jam">
+                <option value="130L / Jam">
+                <option value="135L / Jam">
+                <option value="140L / Jam">
+                <option value="145L / Jam">
+                <option value="150L / Jam">
+              </datalist>
               <small class="form-hint">Used for Start/Stop detection logic.</small>
             </div>
 

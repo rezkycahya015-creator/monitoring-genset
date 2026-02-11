@@ -1108,3 +1108,192 @@ body.is-admin .btn-delete {
     gap: 5px;
   }
 }
+
+/* --- GLOBAL DASHBOARD STYLES --- */
+#global-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* Strict 3 columns */
+  gap: 30px;
+  padding: 20px 0;
+}
+
+/* Full Width Mode Styles */
+body.full-width-mode nav#sidebar {
+  display: none !important;
+}
+
+body.full-width-mode #btn-toggle-nav {
+  display: none !important;
+}
+
+body.full-width-mode main {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.global-card {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  /* Add pointer */
+}
+
+.global-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+.global-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+}
+
+.global-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  width: 100%;
+}
+
+.global-battery-shape {
+  width: 80px;
+  height: 140px;
+  border: 6px solid var(--dark-bg);
+  border-radius: 12px;
+  position: relative;
+  padding: 4px;
+}
+
+.global-battery-shape::before {
+  content: "";
+  width: 40px;
+  height: 10px;
+  background: var(--dark-bg);
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 4px 4px 0 0;
+}
+
+.global-battery-level {
+  width: 100%;
+  height: 0%;
+  /* Dynamic */
+  background: var(--status-green);
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  width: calc(100% - 8px);
+  border-radius: 6px;
+  transition: height 1s ease-in-out, background-color 0.3s;
+}
+
+.global-info {
+  text-align: left;
+}
+
+.global-percentage {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: var(--status-green);
+  line-height: 1;
+  margin-bottom: 5px;
+}
+
+.global-status-label {
+  font-size: 1rem;
+  color: #666;
+}
+
+.global-status-val {
+  font-weight: 700;
+  color: var(--status-green);
+  font-size: 1.1rem;
+}
+
+@media (max-width: 992px) {
+  #global-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    /* 2 columns on tablet */
+  }
+}
+
+@media (max-width: 768px) {
+  #global-cards-grid {
+    grid-template-columns: 1fr;
+    /* Single column on mobile */
+  }
+
+  .global-card-body {
+    flex-direction: row;
+    /* Keep row even on mobile for this design */
+    gap: 20px;
+  }
+
+  .global-percentage {
+    font-size: 2.5rem;
+  }
+}
+
+/* --- ACTION BUTTONS (NEW STYLE) --- */
+.action-cell {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-edit,
+.btn-delete-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  color: white !important;
+  transition: opacity 0.2s;
+}
+
+.btn-edit {
+  background-color: #3498db;
+}
+
+.btn-edit i {
+  font-size: 1rem;
+}
+
+.btn-delete-icon {
+  background-color: #e74c3c;
+}
+
+.btn-delete-icon i {
+  font-size: 1rem;
+}
+
+.btn-edit:hover,
+.btn-delete-icon:hover {
+  opacity: 0.9;
+}
