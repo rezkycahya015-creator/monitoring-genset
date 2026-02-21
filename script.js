@@ -31,10 +31,8 @@ function showPage(pageId) {
 
   // Tutup sidebar jika di mobile setelah pindah halaman
   closeSidebar();
-
-  // Tutup sidebar jika di mobile setelah pindah halaman
-  closeSidebar();
 }
+
 
 // --- SIDEBAR TOGGLE LOGIC ---
 const sidebar = document.getElementById("sidebar");
@@ -51,7 +49,37 @@ sidebarOverlay.addEventListener("click", closeSidebar);
 function closeSidebar() {
   sidebar.classList.remove("active");
   sidebarOverlay.classList.remove("active");
+  closeSidebarPopup();
 }
+
+// --- SIDEBAR POPUP (Logo Click di Dashboard Global) ---
+const logoBtnEl = document.getElementById("logo-btn");
+
+function openSidebarPopup() {
+  sidebar.classList.add("popup-open");
+  sidebarOverlay.classList.add("popup-mode");
+}
+
+function closeSidebarPopup() {
+  sidebar.classList.remove("popup-open");
+  sidebarOverlay.classList.remove("popup-mode");
+}
+
+if (logoBtnEl) {
+  logoBtnEl.addEventListener("click", () => {
+    if (document.body.classList.contains("full-width-mode")) {
+      if (sidebar.classList.contains("popup-open")) {
+        closeSidebarPopup();
+      } else {
+        openSidebarPopup();
+      }
+    }
+  });
+}
+
+sidebarOverlay.addEventListener("click", closeSidebarPopup);
+
+
 
 // --- CONFIG FIREBASE ---
 const firebaseConfig = {
@@ -367,6 +395,8 @@ function renderDashboard() {
 // State Global untuk Data
 let operationalHistoryData = [];
 let fuelLogData = [];
+let rawHistoryData = []; // Simpan history mentah untuk digabung ke log
+
 
 const logTableBody = document.getElementById("log-table-body");
 const riwayatTableBody = document.getElementById("riwayat-table-body");
@@ -381,27 +411,24 @@ const btnExportLogs = document.getElementById("btn-export-logs");
 // 1. DATA RIWAYAT OPERASIONAL (Fetch from /genset/history)
 // 1. DATA RIWAYAT OPERASIONAL (Handler Baru)
 function handleHistoryData(data) {
-  operationalHistoryData = []; // Reset
+  operationalHistoryData = [];
+  rawHistoryData = [];
 
   if (data) {
-    // Convert Object to Array
     Object.keys(data).forEach((key) => {
-      operationalHistoryData.push({
-        id: key,
-        ...data[key],
-      });
+      const item = { id: key, ...data[key] };
+      operationalHistoryData.push(item);
+      rawHistoryData.push(item);
     });
-
-    // Urutkan berdasarkan tanggal descending (terbaru diatas)
-    // Asumsi format tanggal di DB bisa diparsing atau string ISO. 
-    // Jika format DD/MM/YYYY, kita perlu parse manual untuk sorting.
-    // Disini saya pakai simple reverse jika data masuk berurutan, atau sort by key.
-    // Urutkan berdasarkan tanggal descending (terbaru diatas)
     operationalHistoryData.reverse();
   }
 
   renderRiwayat(operationalHistoryData);
+
+  // Re-render log agar data pemakaian dari history ikut terupdate
+  renderCombinedLogs();
 }
+
 
 // Render Fungsi Riwayat
 function renderRiwayat(data) {
@@ -433,27 +460,51 @@ function renderRiwayat(data) {
 }
 
 
-// 2. DATA LOG PERUBAHAN BAHAN BAKAR (PERSISTENT /genset/logs)
-// 2. DATA LOG PERUBAHAN BAHAN BAKAR (Handler Baru)
+// 2. DATA LOG PERUBAHAN BAHAN BAKAR
 function handleLogsData(data) {
   fuelLogData = [];
 
   if (data) {
-    // Convert Object to Array
     Object.keys(data).forEach((key) => {
-      fuelLogData.push({
-        id: key,
-        ...data[key],
-      });
+      fuelLogData.push({ id: key, ...data[key] });
     });
-
-    // Reverse agar terbaru diatas
-    fuelLogData.reverse();
   }
 
-  // Render Logs
-  renderLogs(fuelLogData);
+  renderCombinedLogs();
 }
+
+// Gabungkan logs (Pengisian) + history (Pemakaian) dan render
+function renderCombinedLogs() {
+  // Konversi history ke format log pemakaian
+  const pemakaianFromHistory = rawHistoryData.map(h => ({
+    id: 'his_' + h.id,
+    tanggal: h.tanggal || '-',
+    volume_awal: null,
+    volume_akhir: null,
+    konsumsi_bbm: h.konsumsi_bbm || '0 L',
+    status: 'Pemakaian',
+    _fromHistory: true
+  }));
+
+  // Gabungkan
+  const combined = [...fuelLogData, ...pemakaianFromHistory];
+
+  // Sort descending berdasarkan tanggal (format DD/MM/YYYY HH:MM:SS)
+  combined.sort((a, b) => {
+    const parseDate = (str) => {
+      if (!str || str === '-') return 0;
+      // Format: DD/MM/YYYY HH:MM:SS
+      const parts = str.split(' ');
+      if (parts.length < 2) return 0;
+      const [day, month, year] = parts[0].split('/');
+      return new Date(`${year}-${month}-${day}T${parts[1]}`).getTime();
+    };
+    return parseDate(b.tanggal) - parseDate(a.tanggal);
+  });
+
+  renderLogs(combined);
+}
+
 
 function renderLogs(data) {
   logTableBody.innerHTML = "";
@@ -477,33 +528,58 @@ function renderLogs(data) {
       }
     }
 
-    // Hitung Perubahan
+    // Hitung Perubahan Volume
     let volAwal = parseFloat(item.volume_awal || 0);
     let volAkhir = parseFloat(item.volume_akhir || 0);
     let diff = volAkhir - volAwal;
+
+    // Tentukan Jenis Aktivitas (prioritas: field status dari Firebase)
+    let activityType = "";
+    if (item.status === "Pengisian" || item.status === "pengisian") {
+      activityType = "pengisian";
+    } else if (item.status === "Pemakaian" || item.status === "pemakaian") {
+      activityType = "pemakaian";
+    } else {
+      activityType = diff >= 0 ? "pengisian" : "pemakaian";
+    }
 
     let volumeText = "";
     let volumeStyle = "";
     let activityBadge = "";
 
-    if (diff >= 0) {
-      volumeText = "+ " + diff.toFixed(1) + " L";
+    if (activityType === "pengisian") {
+      volumeText = "+ " + Math.abs(diff).toFixed(1) + " L";
       volumeStyle = "color: #2e7d32; font-weight: 600;";
       activityBadge = `<span class="status-badge badge-fill"><i class="fa-solid fa-gas-pump"></i> Pengisian</span>`;
     } else {
-      volumeText = "- " + Math.abs(diff).toFixed(1) + " L";
+      // Jika dari history, tampilkan konsumsi_bbm langsung (lebih akurat)
+      if (item._fromHistory && item.konsumsi_bbm) {
+        volumeText = "- " + item.konsumsi_bbm;
+      } else {
+        volumeText = "- " + Math.abs(diff).toFixed(1) + " L";
+      }
       volumeStyle = "color: #e67e22; font-weight: 600;";
       activityBadge = `<span class="status-badge badge-drain"><i class="fa-solid fa-arrow-trend-down"></i> Pemakaian</span>`;
     }
 
+    // Tombol delete sesuai sumber data
+    const deleteBtn = item._fromHistory
+      ? `<button class="btn-delete" onclick="deleteHistory('${item.id.replace('his_', '')}')"><i class="fa-solid fa-trash"></i></button>`
+      : `<button class="btn-delete" onclick="deleteLog('${item.id}')"><i class="fa-solid fa-trash"></i></button>`;
+
+    // Checkbox: sembunyikan untuk item dari history (agar tidak masuk bulk delete logs)
+    const checkboxHtml = item._fromHistory
+      ? `<td class="admin-only-col check-col"></td>`
+      : `<td class="admin-only-col check-col"><input type="checkbox" class="admin-checkbox logs-check" value="${item.id}"></td>`;
+
+
+
     const row = `
         <tr>
-            <td class="admin-only-col check-col">
-                <input type="checkbox" class="admin-checkbox logs-check" value="${item.id}">
-            </td>
+            ${checkboxHtml}
             <td class="date-cell">
               <span>${datePart}</span>
-              <button class="btn-delete" onclick="deleteLog('${item.id}')"><i class="fa-solid fa-trash"></i></button>
+              ${deleteBtn}
             </td>
             <td>${timePart}</td>
             <td style="${volumeStyle}">${volumeText}</td>
@@ -512,6 +588,7 @@ function renderLogs(data) {
         </tr>
       `;
     logTableBody.innerHTML += row;
+
   });
 }
 
@@ -686,14 +763,18 @@ function showAdminDashboard(isLoggedIn) {
     loginForm.style.display = 'none';
     adminDash.style.display = 'block';
 
-    // Show Config Button for Admin
+    // Show Config Button for Admin (sidebar & drawer)
     if (btnConfig) btnConfig.style.display = 'flex';
+    const drawerBtnConfig = document.getElementById('drawer-btn-config');
+    if (drawerBtnConfig) drawerBtnConfig.style.display = 'flex';
   } else {
     loginForm.style.display = 'block';
     adminDash.style.display = 'none';
 
-    // Hide Config Button for Non-Admin
+    // Hide Config Button for Non-Admin (sidebar & drawer)
     if (btnConfig) btnConfig.style.display = 'none';
+    const drawerBtnConfig = document.getElementById('drawer-btn-config');
+    if (drawerBtnConfig) drawerBtnConfig.style.display = 'none';
 
     // If currently on config page, redirect to dashboard
     if (document.getElementById('config').classList.contains('active')) {
@@ -765,18 +846,23 @@ const modalDeviceId = document.getElementById("modal-device-id");
 // Listen ke seluruh devices untuk memisahkan Pending vs Active
 db.ref("/devices").on("value", (snapshot) => {
   const data = snapshot.val();
-  if (!data) return;
+  console.log("📡 Firebase data received:", data); // DEBUG
+  if (!data) {
+    console.warn("⚠️ Tidak ada data devices di Firebase");
+    return;
+  }
 
   const devices = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+  console.log("📋 Semua devices:", devices.map(d => ({ id: d.id, isActive: d.config?.isActive })));
 
-  // 1. Filter Waiting Room (isActive != true)
-  // STRICT FILTER: Hanya muncul jika isActive FALSE atau UNDEFINED
+  // 1. Filter Waiting Room: isActive BUKAN true (termasuk undefined/false)
   const pendingDevices = devices.filter(d => !d.config || d.config.isActive !== true);
+  console.log("⏳ Pending devices:", pendingDevices.map(d => d.id));
   if (waitingRoomList) renderWaitingRoom(pendingDevices);
 
-  // 2. Filter Active Devices (isActive == true)
-  // STRICT FILTER: Hanya muncul jika isActive TRUE
+  // 2. Filter Active Devices: isActive === true
   const activeDevices = devices.filter(d => d.config && d.config.isActive === true);
+  console.log("✅ Active devices:", activeDevices.map(d => d.id));
   if (configTableBody) renderConfigTable(activeDevices);
 
   // 3. Render Global Dashboard
@@ -787,6 +873,7 @@ db.ref("/devices").on("value", (snapshot) => {
   // Update Dropdown di Header agar SINKRON dengan Strict Filter
   updateDeviceDropdown(activeDevices);
 });
+
 
 function updateDeviceDropdown(activeDevices) {
   if (!deviceSelect) return;

@@ -22,7 +22,8 @@
     <div class="logo-area">
       <i class="fa-solid fa-bars" id="btn-toggle-nav"
         style="font-size: 1.5rem; cursor: pointer; display: none; margin-right: 15px;"></i>
-      <img src="Assets/logo.png" alt="Logo" style="height: 40px; width: auto; margin-right: 10px;">
+      <img src="Assets/logo.png" alt="Logo" id="logo-btn"
+        style="height: 40px; width: auto; margin-right: 10px; cursor: pointer;" title="Menu Navigasi">
       <h1>Genset Fuel Monitoring System</h1>
     </div>
     <div class="user-area">
@@ -46,6 +47,7 @@
 
   <div class="wrapper">
     <div id="sidebar-overlay"></div>
+
     <nav id="sidebar">
       <button onclick="showPage('dashboard-global')" id="btn-dashboard-global" class="nav-item active">
         <i class="fa-solid fa-layer-group"></i>
@@ -494,7 +496,6 @@
         </div>
       </div>
 
-    </main>
   </div>
 
   <script src="script.js?v=2.1"></script>

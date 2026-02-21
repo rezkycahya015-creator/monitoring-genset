@@ -1119,8 +1119,25 @@ body.is-admin .btn-delete {
 }
 
 /* Full Width Mode Styles */
+/* Sidebar tersembunyi di kiri (di luar layar) saat full-width-mode */
 body.full-width-mode nav#sidebar {
-  display: none !important;
+  position: fixed !important;
+  top: 70px !important;
+  /* tepat di bawah header */
+  left: -270px !important;
+  height: calc(100vh - 70px) !important;
+  z-index: 1200 !important;
+  width: 250px !important;
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  padding-top: 10px !important;
+  display: flex !important;
+  flex-direction: column;
+}
+
+/* Saat popup terbuka */
+body.full-width-mode nav#sidebar.popup-open {
+  left: 0 !important;
 }
 
 body.full-width-mode #btn-toggle-nav {
@@ -1131,6 +1148,20 @@ body.full-width-mode main {
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
+}
+
+/* Overlay untuk sidebar popup di full-width-mode */
+#sidebar-overlay.popup-mode {
+  position: fixed;
+  top: 70px;
+  left: 0;
+  width: 100%;
+  height: calc(100vh - 70px);
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1199;
+  display: block;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s;
 }
 
 .global-card {
@@ -1296,4 +1327,14 @@ body.full-width-mode main {
 .btn-edit:hover,
 .btn-delete-icon:hover {
   opacity: 0.9;
+}
+
+/* Animasi logo saat diklik */
+#logo-btn {
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+#logo-btn:hover {
+  opacity: 0.85;
+  transform: scale(1.05);
 }
